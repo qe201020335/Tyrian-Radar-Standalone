@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<TargetFramework>net472</TargetFramework>
 		<AssemblyName>Tyrian-Radar</AssemblyName>
-		<DependencyVersion>27622-sit</DependencyVersion>
+		<DependencyVersion>0.14.1.2.29197-aki</DependencyVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
