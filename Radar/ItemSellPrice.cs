@@ -8,7 +8,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
-using CurrencyUtil = GClass2334;
+// using CurrencyUtil = GClass2334;
 
 internal static class TraderClassExtensions
 {
