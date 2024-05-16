@@ -15,6 +15,7 @@ namespace Radar
         {
             new GClass723PatchAdd().Enable();
             new GClass723PatchRemove().Enable();
+            new PlayerOnMakingShotPatch().Enable();
             var playerCamera = GameObject.Find("FPS Camera");
             if (playerCamera == null)
             {

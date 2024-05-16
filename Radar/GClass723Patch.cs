@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Reflection;
 using Aki.Reflection.Patching;
-using UnityEngine;
 using EFT.Interactive;
 
 namespace Radar

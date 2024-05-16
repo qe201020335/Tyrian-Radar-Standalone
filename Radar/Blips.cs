@@ -69,6 +69,11 @@ namespace Radar
             blip.transform.localScale = new Vector3(blipSize, blipSize, blipSize);
         }
 
+        public void UpdateLastFireTime(float lastFireTime)
+        {
+            lastUpdateTime = lastFireTime;
+        }
+
         public void Update(bool updatePosition)
         {
             bool _show = false;
@@ -84,8 +89,9 @@ namespace Radar
                     blipPosition.z = targetPosition.z - playerPosition.z;
                 }
 
-                _show = blipPosition.x * blipPosition.x + blipPosition.z * blipPosition.z
-                     > radarRange * radarRange ? false : true;
+                var distance = blipPosition.x * blipPosition.x + blipPosition.z * blipPosition.z;
+                _show = (distance > radarOuterRange * radarOuterRange || distance < radarInnerRange * radarInnerRange) ? false : true;
+                
                 if (!_isDead && _enemyPlayer.HealthController.IsAlive == _isDead)
                 {
                     _isDead = true;
@@ -106,8 +112,11 @@ namespace Radar
 
             if (show)
             {
-                UpdateAlpha();
                 UpdateBlipImage();
+                if (Radar.radarEnableFireModeConfig.Value && !_isDead)
+                    UpdateAlpha(Time.time - lastUpdateTime < 3, 3);
+                else
+                    UpdateAlpha(updatePosition);
                 UpdatePosition(updatePosition);
             }
         }
@@ -158,7 +167,7 @@ namespace Radar
             blip.transform.localScale = new Vector3(blipSize, blipSize, blipSize);
         }
 
-        public void Update(bool updatePosition, bool _show = false)
+        public void Update(bool _show)
         {
             if (_lazyUpdate)
             {
@@ -177,9 +186,9 @@ namespace Radar
             }
             else
             {
-                UpdateAlpha();
                 UpdateBlipImage();
-                UpdatePosition(updatePosition);
+                //UpdateAlpha();
+                UpdatePosition(true);
             }
         }
 
@@ -198,7 +207,9 @@ namespace Radar
         protected Vector3 blipPosition;
         public Vector3 targetPosition;
         public static Vector3 playerPosition;
-        public static float radarRange;
+        public static float radarOuterRange;
+        public static float radarInnerRange;
+        protected float lastUpdateTime = Time.time;
 
         protected float playerHeight = 1.8f;
 
@@ -233,12 +244,13 @@ namespace Radar
             Target.playerPosition = playerPosition;
         }
 
-        public static void setRadarRange(float radarRange)
+        public static void setRadarRange(float inner, float outer)
         {
-            Target.radarRange = radarRange;
+            Target.radarInnerRange = inner;
+            Target.radarOuterRange = outer;
         }
 
-        protected void UpdateAlpha()
+        protected void UpdateAlpha(bool updatePosition = false, float interval = -1)
         {
             float r, g, b, a;
             if (blipImage != null)
@@ -248,11 +260,26 @@ namespace Radar
                 b = blipImage.color.b;
                 a = blipImage.color.a;
                 float delta_a = 1;
-                if (Radar.radarScanInterval.Value > 0.8)
+                if (interval < 0)
                 {
-                    float ratio = (Time.time - HaloRadar.RadarLastUpdateTime) / Radar.radarScanInterval.Value;
-                    delta_a = 1 - ratio * ratio;
+                    interval = Radar.radarScanInterval.Value;
+                    if (interval > 3)
+                        interval = 3;
                 }
+
+                if (interval > 0.9)
+                {
+                    float timeDiff = Time.time - lastUpdateTime;
+                    if (interval <= timeDiff && updatePosition)
+                    {
+                        lastUpdateTime = Time.time;
+                    }
+                    float ratio = timeDiff / interval;
+                    delta_a = 1 - ratio * ratio;
+                    if (delta_a < 0)
+                        delta_a = 0;
+                }
+
                 blipImage.color = new Color(r, g, b, a * delta_a);
             }
         }
@@ -270,7 +297,7 @@ namespace Radar
             // Calculate the position based on the angle and distance
             float distance = Mathf.Sqrt(blipPosition.x * blipPosition.x + blipPosition.z * blipPosition.z);
             // Calculate the offset factor based on the distance
-            float offsetRadius = Mathf.Pow(distance / radarRange, 0.4f + Radar.radarDistanceScaleConfig.Value * Radar.radarDistanceScaleConfig.Value / 2.0f);
+            float offsetRadius = Mathf.Pow(distance / radarOuterRange, 0.4f + Radar.radarDistanceScaleConfig.Value * Radar.radarDistanceScaleConfig.Value / 2.0f);
             // Calculate angle
             // Apply the rotation of the parent transform
             Vector3 rotatedDirection = HaloRadar.RadarHudBlipBasePosition.rotation * Vector3.forward;

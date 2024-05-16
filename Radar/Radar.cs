@@ -5,11 +5,12 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using Radar.Patches;
+using UnityEditor;
 using UnityEngine;
 
 namespace Radar
 {
-    [BepInPlugin("Tyrian.Radar", "Radar", "1.1.3")]
+    [BepInPlugin("Tyrian.Radar", "Radar", "1.1.4")]
     public class Radar : BaseUnityPlugin
     {
         internal static Radar Instance {get; private set;}
@@ -26,6 +27,7 @@ namespace Radar
         public static ConfigEntry<bool> radarEnablePulseConfig;
         public static ConfigEntry<bool> radarEnableCorpseConfig;
         public static ConfigEntry<bool> radarEnableLootConfig;
+        public static ConfigEntry<bool> radarEnableFireModeConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableShortCutConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableCorpseShortCutConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableLootShortCutConfig;
@@ -36,9 +38,11 @@ namespace Radar
         public static ConfigEntry<float> radarYHeightThreshold;
         public static ConfigEntry<float> radarOffsetYConfig;
         public static ConfigEntry<float> radarOffsetXConfig;
-        public static ConfigEntry<float> radarRangeConfig;
+        public static ConfigEntry<float> radarOuterRangeConfig;
+        public static ConfigEntry<float> radarInnerRangeConfig;
         public static ConfigEntry<float> radarScanInterval;
         public static ConfigEntry<float> radarLootThreshold;
+        public static ConfigEntry<bool> radarLootPerSlotConfig;
 
         public static ConfigEntry<Color> bossBlipColor;
         public static ConfigEntry<Color> usecBlipColor;
@@ -72,12 +76,13 @@ namespace Radar
             radarEnableConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_enable"), true);
             radarEnableShortCutConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_enable_shortcut"), new KeyboardShortcut(KeyCode.F10));
             radarEnablePulseConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_pulse_enable"), true, Locales.GetTranslatedString("radar_pulse_enable_info"));
+            radarEnableFireModeConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_fire_mode_enable"), true, Locales.GetTranslatedString("radar_fire_mode_enable_info"));
 
             radarEnableCorpseConfig = Config.Bind(advancedSettings, Locales.GetTranslatedString("radar_corpse_enable"), false);
             radarEnableCorpseShortCutConfig = Config.Bind(advancedSettings, Locales.GetTranslatedString("radar_corpse_shortcut"), new KeyboardShortcut(KeyCode.F11));
             radarEnableLootConfig = Config.Bind(advancedSettings, Locales.GetTranslatedString("radar_loot_enable"), false);
             radarEnableLootShortCutConfig = Config.Bind(advancedSettings, Locales.GetTranslatedString("radar_loot_shortcut"), new KeyboardShortcut(KeyCode.F9));
-
+            radarLootPerSlotConfig = Config.Bind(advancedSettings, Locales.GetTranslatedString("radar_loot_per_slot"), false);
             radarSizeConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_hud_size"), 0.8f,
                 new ConfigDescription(Locales.GetTranslatedString("radar_hud_size_info"), new AcceptableValueRange<float>(0.0f, 1f)));
             radarBlipSizeConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_blip_size"), 0.7f,
@@ -90,8 +95,10 @@ namespace Radar
                 new ConfigDescription(Locales.GetTranslatedString("radar_x_position_info"), new AcceptableValueRange<float>(-4000f, 4000f)));
             radarOffsetYConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_y_position"), 0f,
                 new ConfigDescription(Locales.GetTranslatedString("radar_y_position_info"), new AcceptableValueRange<float>(-4000f, 4000f)));
-            radarRangeConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_range"), 128f,
-                new ConfigDescription(Locales.GetTranslatedString("radar_range_info"), new AcceptableValueRange<float>(32f, 512f)));
+            radarOuterRangeConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_outer_range"), 128f,
+                new ConfigDescription(Locales.GetTranslatedString("radar_outer_range_info"), new AcceptableValueRange<float>(32f, 1024f)));
+            radarInnerRangeConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_inner_range"), 0f,
+                new ConfigDescription(Locales.GetTranslatedString("radar_inner_range_info"), new AcceptableValueRange<float>(0f, 64f)));
             radarScanInterval = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_scan_interval"), 1f,
                 new ConfigDescription(Locales.GetTranslatedString("radar_scan_interval_info"), new AcceptableValueRange<float>(0.1f, 30f)));
             radarLootThreshold = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_loot_threshold"), 30000f,

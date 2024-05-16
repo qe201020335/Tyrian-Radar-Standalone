@@ -29,8 +29,7 @@ namespace Radar
 
         public static float RadarLastUpdateTime = 0;
 
-        private readonly HashSet<int> _enemyList = new HashSet<int>();
-        private readonly List<BlipPlayer> _enemyCustomObject = new List<BlipPlayer>();
+        private readonly Dictionary<int, BlipPlayer> _enemyList = new Dictionary<int, BlipPlayer>();
 
         private readonly List<BlipLoot> _lootCustomObject = new List<BlipLoot>();
         private Quadtree? _lootTree = null;
@@ -152,8 +151,15 @@ namespace Radar
         public void AddLoot(LootItem item, bool lazyUpdate = false, int key = 0)
         {
             var blip = new BlipLoot(item, lazyUpdate, key);
-            if (blip._price > Radar.radarLootThreshold.Value)
+            var price = blip._price;
+            if (Radar.radarLootPerSlotConfig.Value)
             {
+                price /= item.Item.CalculateCellSize().X * item.Item.CalculateCellSize().Y;
+            }
+
+            if (price > Radar.radarLootThreshold.Value)
+            {
+                //Debug.LogError($"name: {item.Item.Name}, id: {item.Item.Id}, cell: ({item.Item.CalculateCellSize().X}, {item.Item.CalculateCellSize().Y})");
                 blip.SetBlip();
                 _lootCustomObject.Add(blip);
                 _lootTree?.Insert(blip);
@@ -161,6 +167,14 @@ namespace Radar
             else
             {
                 blip.DestoryLoot();
+            }
+        }
+
+        public void UpdateFireTime(int id)
+        {
+            if (_enemyList.ContainsKey(id))
+            {
+                _enemyList[id].UpdateLastFireTime(Time.time);
             }
         }
 
@@ -237,7 +251,11 @@ namespace Radar
 
         private long UpdateActivePlayer()
         {
-            if (Time.time - RadarLastUpdateTime < Radar.radarScanInterval.Value)
+            float interval = Radar.radarScanInterval.Value;
+            if (Radar.radarEnableFireModeConfig.Value)
+                interval = 0.1f;
+                
+            if (Time.time - RadarLastUpdateTime < interval)
             {
                 return -1;
             }
@@ -258,12 +276,12 @@ namespace Radar
                 {
                     continue;
                 }
-                if (!_enemyList.Contains(enemyPlayer.Id))
+                if (!_enemyList.ContainsKey(enemyPlayer.Id))
                 {
-                    _enemyList.Add(enemyPlayer.Id);
                     var blip = new BlipPlayer(enemyPlayer);
                     blip.SetBlip();
-                    _enemyCustomObject.Add(blip);
+                    _enemyList.Add(enemyPlayer.Id, blip);
+                    Debug.LogError($"Player Id: {enemyPlayer.Id}");
                 }
             }
             return 0;
@@ -276,7 +294,7 @@ namespace Radar
                 return;
             }
             Vector2 center = new Vector2(_player.Transform.position.x, _player.Transform.position.z);
-            var latestActiveLootOnRadar = _lootTree?.QueryRange(center, Radar.radarRangeConfig.Value);
+            var latestActiveLootOnRadar = _lootTree?.QueryRange(center, Radar.radarOuterRangeConfig.Value);
             _lootToHide.Clear();
             if (_activeLootOnRadar != null)
             {
@@ -296,22 +314,22 @@ namespace Radar
         private void UpdateRadar(bool positionUpdate = true)
         {
             Target.setPlayerPosition(_player.Transform.position);
-            Target.setRadarRange(Radar.radarRangeConfig.Value);
-            foreach (var obj in _enemyCustomObject)
+            Target.setRadarRange(Radar.radarInnerRangeConfig.Value, Radar.radarOuterRangeConfig.Value);
+            foreach (var obj in _enemyList)
             {
-                obj.Update(positionUpdate);
+                obj.Value.Update(positionUpdate);
             }
 
             foreach (var obj in _lootToHide)
             {
-                obj.Update(positionUpdate, false);
+                obj.Update(false);
             }
 
             if (_activeLootOnRadar != null)
             {
                 foreach (var obj in _activeLootOnRadar)
                 {
-                    obj.Update(positionUpdate, true);
+                    obj.Update(true);
                 }
             }
         }
