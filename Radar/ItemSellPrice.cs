@@ -6,8 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
-
-using CurrencyUtil = GClass2334;
+using Aki.Common.Http;
+using Newtonsoft.Json;
 
 internal static class TraderClassExtensions
 {
@@ -29,13 +29,15 @@ internal static class TraderClassExtensions
         if (result.Succeed)
             trader.SetSupplyData(result.Value);
         else
-            Debug.LogError("Failed to download supply data");
+            UnityEngine.Debug.LogError("Failed to download supply data");
     }
 }
 
 class ItemExtensions
 {
     public static ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
+    static Dictionary<string, int> fleaCache = new Dictionary<string, int>();
+    static Dictionary<string, int> traderCache = new Dictionary<string, int>();
 
     public sealed class TraderOffer
     {
@@ -85,7 +87,57 @@ class ItemExtensions
             .Where(offer => offer != null)
             .OrderByDescending(offer => offer?.Price * offer?.Course);
     }
+    public class FleaPriceRequest
+    {
+        public string templateId;
+        public FleaPriceRequest(string templateId) => this.templateId = templateId;
+    }
 
-    public static TraderOffer? GetBestTraderOffer(Item item) =>
-        GetAllTraderOffers(item)?.FirstOrDefault() ?? null;
+    public static int GetFleaPrice(Item item)
+    {
+        ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
+        if (!Session.RagFair.Available)
+        {
+            return 0;
+        }
+
+        if (fleaCache.ContainsKey(item.Name))
+        {
+            return fleaCache[item.Name];
+        }
+        var response = RequestHandler.PostJson("/LootValue/GetItemLowestFleaPrice", JsonConvert.SerializeObject(new FleaPriceRequest(item.TemplateId)));
+        bool hasPlayerFleaPrice = !(string.IsNullOrEmpty(response) || response == "null");
+        var price = 0;
+        if (hasPlayerFleaPrice)
+        {
+            price = int.Parse(response);
+        }
+        fleaCache[item.Name] = price;
+        return price;
+    }
+
+    public static int GetBestTraderPrice(Item item)
+    {
+        if (traderCache.ContainsKey(item.Name))
+        {
+            return traderCache[item.Name];
+        }
+
+        var offer = GetAllTraderOffers(item)?.FirstOrDefault() ?? null;
+        var price = 0;
+        if (offer != null)
+        {
+            price = offer.Price;
+        }
+        traderCache[item.Name] = price;
+        return price;
+    }
+        
+
+    public static int GetBestPrice(Item item)
+    {                                                                                 
+        var fleaPrice = GetFleaPrice(item);
+        var traderPrice = GetBestTraderPrice(item);
+        return fleaPrice > traderPrice ? fleaPrice : traderPrice;
+    }
 }

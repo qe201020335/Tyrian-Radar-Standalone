@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using EFT.Interactive;
 using System.Linq;
 using BepInEx.Configuration;
+using Aki.Reflection.Utils;
 
 namespace Radar
 {
@@ -110,10 +111,10 @@ namespace Radar
             if (e == null || e.ChangedSetting == Radar.radarEnablePulseConfig)
             {
                 TogglePulseAnimation(Radar.radarEnablePulseConfig.Value);
-                Radar.radarEnableLootConfig.Value = false;
             }
 
-            if (e != null && (e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
+            if (e != null && (e.ChangedSetting == Radar.radarEnablePulseConfig || 
+                e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
             {
                 if (Radar.radarEnableLootConfig.Value)
                 {
@@ -159,7 +160,6 @@ namespace Radar
 
             if (price > Radar.radarLootThreshold.Value)
             {
-                //Debug.LogError($"name: {item.Item.Name}, id: {item.Item.Id}, cell: ({item.Item.CalculateCellSize().X}, {item.Item.CalculateCellSize().Y})");
                 blip.SetBlip();
                 _lootCustomObject.Add(blip);
                 _lootTree?.Insert(blip);
@@ -281,7 +281,6 @@ namespace Radar
                     var blip = new BlipPlayer(enemyPlayer);
                     blip.SetBlip();
                     _enemyList.Add(enemyPlayer.Id, blip);
-                    Debug.LogError($"Player Id: {enemyPlayer.Id}");
                 }
             }
             return 0;

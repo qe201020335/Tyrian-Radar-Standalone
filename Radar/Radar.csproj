@@ -49,6 +49,14 @@
 			<HintPath>..\dependencies\Aki.Reflection.dll</HintPath>
           <Private>False</Private>
         </Reference>
+		<Reference Include="Aki.Common">
+			<HintPath>..\dependencies\Aki.Common.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
+		<Reference Include="Newtonsoft.Json">
+			<HintPath>..\dependencies\Newtonsoft.Json.dll</HintPath>
+			<Private>False</Private>
+		</Reference>
 	</ItemGroup>
 
 	<ItemGroup>

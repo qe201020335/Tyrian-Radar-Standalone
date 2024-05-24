@@ -136,13 +136,8 @@ namespace Radar
             _itemId = item.ItemId;
             _lazyUpdate = lazyUpdate;
             _key = key;
-            var offer = ItemExtensions.GetBestTraderOffer(item.Item);
             targetPosition = item.TrackableTransform.position;
-
-            if (offer != null)
-            {
-                _price = offer.Price;
-            }
+            _price = ItemExtensions.GetBestPrice(item.Item);
         }
 
         private void UpdateBlipImage()
