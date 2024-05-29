@@ -113,8 +113,7 @@ namespace Radar
                 TogglePulseAnimation(Radar.radarEnablePulseConfig.Value);
             }
 
-            if (e != null && (e.ChangedSetting == Radar.radarEnablePulseConfig || 
-                e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
+            if ((e == null || e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
             {
                 if (Radar.radarEnableLootConfig.Value)
                 {
