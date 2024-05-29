@@ -55,7 +55,7 @@ namespace Radar
             }
             
             _player = _gameWorld.MainPlayer;
-                
+
             RadarHudBasePosition = (transform.Find("Radar") as RectTransform)!;
             RadarHudBlipBasePosition = (transform.Find("Radar/RadarBorder") as RectTransform)!;
             RadarHudBlipBasePosition.SetAsLastSibling();
@@ -63,10 +63,11 @@ namespace Radar
             _radarScaleStart = RadarHudBasePosition.localScale;
             _radarPositionYStart = RadarHudBasePosition.position.y;
             _radarPositionXStart = RadarHudBasePosition.position.x;
-            RadarHudBasePosition.position = new Vector2(_radarPositionXStart + Radar.radarOffsetXConfig.Value, _radarPositionYStart + Radar.radarOffsetYConfig.Value);
+            //RadarHudBasePosition.position = new Vector2(_radarPositionXStart + Radar.radarOffsetXConfig.Value, _radarPositionYStart + Radar.radarOffsetYConfig.Value);
             RadarHudBasePosition.localScale = new Vector2(_radarScaleStart.x * Radar.radarSizeConfig.Value, _radarScaleStart.y * Radar.radarSizeConfig.Value);
+            RadarHudBasePosition.localPosition = new Vector3(0, 0, 0);
 
-            
+
             RadarHudBlipBasePosition.GetComponent<Image>().color = Radar.backgroundColor.Value;
             _radarHudPulse.GetComponent<Image>().color = Radar.backgroundColor.Value;
             transform.Find("Radar/RadarBackground").GetComponent<Image>().color = Radar.backgroundColor.Value;
@@ -219,9 +220,9 @@ namespace Radar
 
         private void Update()
         {
-            RadarHudBasePosition.position = new Vector2(_radarPositionXStart + Radar.radarOffsetXConfig.Value, _radarPositionYStart + Radar.radarOffsetYConfig.Value);
-            RadarHudBasePosition.localScale = new Vector2(_radarScaleStart.x * Radar.radarSizeConfig.Value, _radarScaleStart.y * Radar.radarSizeConfig.Value);
-            RadarHudBlipBasePosition.eulerAngles = new Vector3(0, 0, transform.parent.transform.eulerAngles.y);
+            //RadarHudBasePosition.position = new Vector2(_radarPositionXStart + Radar.radarOffsetXConfig.Value, _radarPositionYStart + Radar.radarOffsetYConfig.Value);
+            //RadarHudBasePosition.localScale = new Vector2(_radarScaleStart.x * Radar.radarSizeConfig.Value, _radarScaleStart.y * Radar.radarSizeConfig.Value);
+            //RadarHudBlipBasePosition.eulerAngles = new Vector3(0, 0, transform.parent.transform.eulerAngles.y);
             
             UpdateLoot();
             long rslt = UpdateActivePlayer();
