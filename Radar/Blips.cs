@@ -210,10 +210,9 @@ namespace Radar
 
         public void SetBlip()
         {
-            var blipInstance = Object.Instantiate(AssetBundleManager.RadarBliphudPrefab,
-                HaloRadar.RadarHudBlipBasePosition.position, HaloRadar.RadarHudBlipBasePosition.rotation);
+            var blipInstance = Object.Instantiate(AssetBundleManager.RadarBliphudPrefab);
             blip = blipInstance as GameObject;
-            blip.transform.parent = HaloRadar.RadarHudBlipBasePosition.transform;
+            blip.transform.parent = HaloRadar.RadarBorderTransform.transform;
             blip.transform.SetAsLastSibling();
 
             var blipTransform = blip.transform.Find("Blip/RadarEnemyBlip") as RectTransform;
@@ -282,7 +281,7 @@ namespace Radar
         protected void UpdatePosition(bool updatePosition)
         {
             if (blip == null) return;
-            Quaternion reverseRotation = Quaternion.Inverse(HaloRadar.RadarHudBlipBasePosition.rotation);
+            Quaternion reverseRotation = Quaternion.Inverse(HaloRadar.RadarBorderTransform.rotation);
             blip.transform.localRotation = reverseRotation;
 
             if (!updatePosition)
@@ -295,14 +294,14 @@ namespace Radar
             float offsetRadius = Mathf.Pow(distance / radarOuterRange, 0.4f + Radar.radarDistanceScaleConfig.Value * Radar.radarDistanceScaleConfig.Value / 2.0f);
             // Calculate angle
             // Apply the rotation of the parent transform
-            Vector3 rotatedDirection = HaloRadar.RadarHudBlipBasePosition.rotation * Vector3.forward;
+            Vector3 rotatedDirection = HaloRadar.RadarBorderTransform.rotation * Vector3.forward;
             float angle = Mathf.Atan2(rotatedDirection.x, rotatedDirection.z) * Mathf.Rad2Deg;
             float angleInRadians = Mathf.Atan2(blipPosition.x, blipPosition.z);
 
-            // Get the scale of the RadarHudBlipBasePosition
-            Vector3 scale = HaloRadar.RadarHudBlipBasePosition.localScale;
+            // Get the scale of the RadarBorderTransform
+            Vector3 scale = HaloRadar.RadarBorderTransform.localScale;
             // Multiply the sizeDelta by the scale to account for scaling
-            Vector2 scaledSizeDelta = HaloRadar.RadarHudBlipBasePosition.sizeDelta;
+            Vector2 scaledSizeDelta = HaloRadar.RadarBorderTransform.sizeDelta;
             scaledSizeDelta.x *= scale.x;
             scaledSizeDelta.y *= scale.y;
             // Calculate the radius of the circular boundary
