@@ -124,7 +124,6 @@ namespace Radar
 
     public class BlipLoot : Target
     {
-        public int _price = 0;
         public LootItem _item;
         public string _itemId;
         private bool _lazyUpdate;
@@ -137,7 +136,6 @@ namespace Radar
             _lazyUpdate = lazyUpdate;
             _key = key;
             targetPosition = item.TrackableTransform.position;
-            _price = ItemExtensions.GetBestPrice(item.Item);
         }
 
         private void UpdateBlipImage()
@@ -212,8 +210,10 @@ namespace Radar
         {
             var blipInstance = Object.Instantiate(AssetBundleManager.RadarBliphudPrefab);
             blip = blipInstance as GameObject;
-            blip.transform.parent = HaloRadar.RadarBorderTransform.transform;
+            blip.transform.SetParent(HaloRadar.RadarBorderTransform.transform);
             blip.transform.SetAsLastSibling();
+            blip.transform.localPosition = Vector3.zero;
+            blip.transform.localRotation = Quaternion.identity;
 
             var blipTransform = blip.transform.Find("Blip/RadarEnemyBlip") as RectTransform;
             if (blipTransform != null)
@@ -226,6 +226,7 @@ namespace Radar
 
         public Target()
         {
+            SetBlip();
         }
 
         public void DestoryBlip()
@@ -281,8 +282,7 @@ namespace Radar
         protected void UpdatePosition(bool updatePosition)
         {
             if (blip == null) return;
-            Quaternion reverseRotation = Quaternion.Inverse(HaloRadar.RadarBorderTransform.rotation);
-            blip.transform.localRotation = reverseRotation;
+            blip.transform.localRotation = Quaternion.Euler(0, 0, 360f - HaloRadar.RadarBorderTransform.rotation.eulerAngles.z);
 
             if (!updatePosition)
             {
@@ -308,9 +308,9 @@ namespace Radar
             float graphicRadius = Mathf.Min(scaledSizeDelta.x, scaledSizeDelta.y) * 0.68f;
 
             // Set the local position of the blip
-            blip.transform.localPosition = new Vector2(
+            blip.transform.localPosition = new Vector3(
                 Mathf.Sin(angleInRadians - angle * Mathf.Deg2Rad),
-                Mathf.Cos(angleInRadians - angle * Mathf.Deg2Rad))
+                Mathf.Cos(angleInRadians - angle * Mathf.Deg2Rad), -0.01f)
                 * offsetRadius * graphicRadius;
         }
     }

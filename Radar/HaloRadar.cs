@@ -19,7 +19,8 @@ namespace Radar
 
         public static RectTransform RadarBorderTransform { get; private set; } = null!;
         public static RectTransform RadarBaseTransform { get; private set; } = null!;
-        
+        public static GameObject RadarBase { get; private set; } = null!;
+
         private RectTransform RadarPulseTransform = null!;
         
         private Coroutine? _pulseCoroutine;
@@ -36,7 +37,7 @@ namespace Radar
         private List<BlipLoot>? _activeLootOnRadar = null;
         private List<BlipLoot> _lootToHide = new List<BlipLoot>();
 
-        // FPS Camera -> RadarHUD -> RadarBaseTransform -> RadarBorderTransform
+        // FPS Camera (this.transform.parent) -> RadarHUD (this.transform) -> RadarBaseTransform (transform.Find("Radar").transform) -> RadarBorderTransform
         private void Awake()
         {
             if (!Singleton<GameWorld>.Instantiated)
@@ -57,8 +58,8 @@ namespace Radar
             _player = _gameWorld.MainPlayer;
 
             RadarBaseTransform = (transform.Find("Radar") as RectTransform)!;
+            RadarBase = RadarBaseTransform.gameObject;
             _radarScaleStart = RadarBaseTransform.localScale;
-            RadarBaseTransform.localScale = RadarBaseTransform.localScale * Radar.radarSizeConfig.Value;
 
             RadarBorderTransform = (transform.Find("Radar/RadarBorder") as RectTransform)!;
             RadarBorderTransform.SetAsLastSibling();
@@ -68,10 +69,10 @@ namespace Radar
             RadarPulseTransform.GetComponent<Image>().color = Radar.backgroundColor.Value;
             transform.Find("Radar/RadarBackground").GetComponent<Image>().color = Radar.backgroundColor.Value;
 
-            Debug.LogError($"$ FPS: {transform.parent} {transform.parent.position} {transform.parent.localPosition}");
-            Debug.LogError($"$ HUD: {transform} {transform.position} {transform.localPosition}");
-            Debug.LogError($"$ RBT: {RadarBaseTransform} {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.parent}");
-            
+            //Debug.LogError($"& HUD: {this.transform.position} {this.transform.localPosition} {this.transform.rotation} {this.transform.localRotation} {this.transform.localScale}");
+            //Debug.LogError($"& RBT: {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
+            //Debug.LogError($"& BOD: {RadarBorderTransform.position} {RadarBorderTransform.localPosition} {RadarBorderTransform.rotation} {RadarBorderTransform.localRotation} {RadarBorderTransform.localScale}");
+
             Radar.Log.LogInfo("Radar loaded");
 
             if (Radar.radarEnableCompassConfig.Value)
@@ -92,7 +93,7 @@ namespace Radar
 
         private void LateUpdate()
         {
-            if (compassOn && compassGlass != null)
+            if (compassOn && compassGlass != null && radarCamera != null)
             {
                 Vector3 compassPosition = compassGlass.transform.position;
                 radarCamera.transform.position = compassPosition;
@@ -109,17 +110,18 @@ namespace Radar
                 radarCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 radarCanvas.worldCamera = null;
             }
-            this.transform.SetParent(GameObject.Find("FPS Camera").transform, true);
+            transform.SetParent(GameObject.Find("FPS Camera").transform);
+            transform.localScale = Vector3.one * 1.3333333f; // 1.333f is the default localScale for transform
+            transform.rotation = Quaternion.identity;
+
             RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
-            Debug.LogError($"# FPS: {transform.parent} {transform.parent.position} {transform.parent.localPosition}");
-            Debug.LogError($"# HUD: {transform} {transform.position} {transform.localPosition}");
-            Debug.LogError($"# RBT: {RadarBaseTransform} {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.parent}");
+            RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
+            RadarBaseTransform.rotation = Quaternion.identity;
+            RadarBorderTransform.rotation = Quaternion.identity;
         }
 
         private void InitCompassRadar()
         {
-            RadarBaseTransform.localPosition = new Vector3(0, 0, 0);
-
             if (radarCamera == null)
             {
                 // Create a RenderTexture
@@ -138,7 +140,8 @@ namespace Radar
                 // Position the camera to render your radar HUD
                 radarCamera.transform.position = new Vector3(0, 0, 0);
                 radarCamera.transform.rotation = Quaternion.identity;
-                radarCamera.transform.localScale = new Vector3(0.003f, 0.003f, 0.003f);
+                radarCamera.transform.localScale = Vector3.one * 0.001f;
+                radarCamera.fieldOfView = Camera.main.fieldOfView;
             }
 
             // Ensure the Canvas is set to World Space
@@ -149,17 +152,13 @@ namespace Radar
                 radarCanvas.worldCamera = radarCamera;
             }
 
-            // Set the radar HUD to be rendered by the radar camera
-            this.transform.SetParent(radarCamera.transform, false);
-
-            // Adjust the size and position of the radar HUD if necessary
-            //RectTransform radarHudRectTransform = GetComponent<RectTransform>();
-            //if (radarHudRectTransform != null)
-            //{
-            //    radarHudRectTransform.localScale = new Vector2(0.1f, 0.1f);  // Adjust size as needed
-            //    radarHudRectTransform.localPosition = Vector3.zero;
-            //}
-            Debug.LogError($"X parent transform {this.transform.parent.name} {this.transform.localPosition}");
+            // Set the parent of RadarHUD
+            transform.SetParent(radarCamera.transform, false);
+            transform.localPosition = Vector3.zero;
+            transform.localRotation = Quaternion.identity;
+            RadarBaseTransform.localPosition = new Vector3(0, 0, 0.25f);
+            RadarBaseTransform.localRotation = Quaternion.Euler(0, -180, 0);
+            RadarBaseTransform.localScale = Vector3.one * 0.125f;
         }
         
         private void OnEnable()
@@ -201,33 +200,46 @@ namespace Radar
                 TogglePulseAnimation(Radar.radarEnablePulseConfig.Value);
             }
 
-            if (e != null && (e.ChangedSetting == Radar.radarOffsetXConfig || e.ChangedSetting == Radar.radarOffsetYConfig))
+            if (e != null && e.ChangedSetting == Radar.backgroundColor)
             {
-                RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
-                Debug.LogError($"Base xxx: {transform.name} {transform.position} {RadarBaseTransform.localPosition}");
-                Debug.LogError($"% FPS: {transform.parent} {transform.parent.position} {transform.parent.localPosition}");
-                Debug.LogError($"% HUD: {transform} {transform.position} {transform.localPosition}");
-                Debug.LogError($"% RBT: {RadarBaseTransform} {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.parent}");
+                RadarBorderTransform.GetComponent<Image>().color = Radar.backgroundColor.Value;
+                RadarPulseTransform.GetComponent<Image>().color = Radar.backgroundColor.Value;
+                transform.Find("Radar/RadarBackground").GetComponent<Image>().color = Radar.backgroundColor.Value;
             }
 
-            if (e != null && e.ChangedSetting == Radar.radarSizeConfig)
+            if (e == null || e.ChangedSetting == Radar.radarEnableCompassConfig)
             {
-                RadarBaseTransform.localScale = new Vector2(_radarScaleStart.x * Radar.radarSizeConfig.Value, _radarScaleStart.y * Radar.radarSizeConfig.Value);
+                if (Radar.radarEnableCompassConfig.Value)
+                {
+                    InitCompassRadar();
+                }
+                else
+                {
+                    InitNormalRadar();
+                }
             }
 
-            //if (e == null || e.ChangedSetting == Radar.radarEnableCompassConfig)
-            //{
-            //    if (Radar.radarEnableCompassConfig.Value)
-            //    {
-            //        InitCompassRadar();
-            //    }
-            //    else
-            //    {
-            //        InitNormalRadar();
-            //    }
-            //}
+            if (!Radar.radarEnableCompassConfig.Value)
+            {
+                if (e != null && !Radar.radarEnableCompassConfig.Value && (e.ChangedSetting == Radar.radarOffsetXConfig || e.ChangedSetting == Radar.radarOffsetYConfig))
+                {
+                    RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
+                }
 
-            if ((e == null || e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
+                if (e != null && e.ChangedSetting == Radar.radarSizeConfig)
+                {
+                    RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
+                }
+            }
+
+            if (e != null && (e.ChangedSetting == Radar.testValue1 || e.ChangedSetting == Radar.testValue2 || e.ChangedSetting == Radar.testValue3))
+            {
+                //transform.localRotation = Quaternion.Euler(Radar.testValue1.Value, Radar.testValue2.Value, Radar.testValue3.Value);
+                radarCamera.orthographicSize = Radar.testValue1.Value;
+                Debug.LogError($"Fov: {radarCamera.fieldOfView} {radarCamera.GetGateFittedFieldOfView()}");
+            }
+
+            if (e == null || e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold)
             {
                 if (Radar.radarEnableLootConfig.Value)
                 {
@@ -264,8 +276,8 @@ namespace Radar
 
         public void AddLoot(LootItem item, bool lazyUpdate = false, int key = 0)
         {
-            var blip = new BlipLoot(item, lazyUpdate, key);
-            var price = blip._price;
+            var price = ItemExtensions.GetBestPrice(item.Item);
+            
             if (Radar.radarLootPerSlotConfig.Value)
             {
                 price /= item.Item.CalculateCellSize().X * item.Item.CalculateCellSize().Y;
@@ -273,13 +285,9 @@ namespace Radar
 
             if (price > Radar.radarLootThreshold.Value)
             {
-                blip.SetBlip();
+                var blip = new BlipLoot(item, lazyUpdate, key);
                 _lootCustomObject.Add(blip);
                 _lootTree?.Insert(blip);
-            }
-            else
-            {
-                blip.DestoryLoot();
             }
         }
 
@@ -333,41 +341,44 @@ namespace Radar
 
         private void Update()
         {
-            if (!compassOn)
+            if (!Radar.radarEnableCompassConfig.Value)
             {
                 RadarBorderTransform.eulerAngles = new Vector3(0, 0, transform.parent.transform.eulerAngles.y);
             }
-            
             
             UpdateLoot();
             long rslt = UpdateActivePlayer();
             UpdateRadar(rslt != -1);
 
-            //if (Radar.radarEnableCompassConfig.Value)
-            //{
-            //    Player.ItemHandsController? handsController = _player.HandsController as Player.ItemHandsController;
-            //    if (handsController != null && handsController.CurrentCompassState)
-            //    {
-            //        compassOn = true;
-            //    }
-            //    else
-            //    {
-            //        compassOn = false;
-            //    }
-            //    if (compassOn && compassGlass == null)
-            //    {
-            //        compassGlass = GameObject.Find("compas_glass_LOD0");
-            //        if (compassGlass != null)
-            //        {
-            //            Renderer compassRenderer = compassGlass.GetComponent<Renderer>();
-            //            if (compassRenderer != null)
-            //            {
-            //                compassRenderer.material.mainTexture = radarRenderTexture;
-            //            }
-            //        }
-            //    }
-            //}
-            
+            if (Radar.radarEnableCompassConfig.Value)
+            {
+                Player.ItemHandsController? handsController = _player.HandsController as Player.ItemHandsController;
+                var compassInHand = handsController != null && handsController.CurrentCompassState;
+                if (compassInHand && !compassOn)
+                {
+                    compassOn = true;
+                    RadarBase.SetActive(true);
+                }
+                if (!compassInHand && compassOn)
+                {
+
+                    compassOn = false;
+                    RadarBase.SetActive(false);
+                }
+
+                if (compassOn && compassGlass == null)
+                {
+                    compassGlass = GameObject.Find("compas_glass_LOD0");
+                    //if (compassGlass != null)
+                    //{
+                    //    Renderer compassRenderer = compassGlass.GetComponent<Renderer>();
+                    //    if (compassRenderer != null)
+                    //    {
+                    //        compassRenderer.material.mainTexture = radarRenderTexture;
+                    //    }
+                    //}
+                }
+            }
         }
 
         private IEnumerator PulseCoroutine()
@@ -419,9 +430,7 @@ namespace Radar
                 }
                 if (!_enemyList.ContainsKey(enemyPlayer.Id))
                 {
-                    var blip = new BlipPlayer(enemyPlayer);
-                    blip.SetBlip();
-                    _enemyList.Add(enemyPlayer.Id, blip);
+                    _enemyList.Add(enemyPlayer.Id, new BlipPlayer(enemyPlayer));
                 }
             }
             return 0;
