@@ -17,7 +17,7 @@ namespace Radar
         static void PostFix(Player __instance, [NotNull] GInterface322 weapon, Vector3 force)
         {
             var radar = InRaidRadarManager._radarGo.GetComponent<HaloRadar>();
-            radar.UpdateFireTime(__instance.Id);
+            radar.UpdateFireTime(__instance.ProfileId);
         }
     }
 }

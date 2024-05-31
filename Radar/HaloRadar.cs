@@ -28,7 +28,7 @@ namespace Radar
 
         public static float RadarLastUpdateTime = 0;
 
-        private readonly Dictionary<int, BlipPlayer> _enemyList = new Dictionary<int, BlipPlayer>();
+        private readonly Dictionary<string, BlipPlayer> _enemyList = new Dictionary<string, BlipPlayer>();
 
         private readonly List<BlipLoot> _lootCustomObject = new List<BlipLoot>();
         private Quadtree? _lootTree = null;
@@ -251,7 +251,7 @@ namespace Radar
             }
         }
 
-        public void UpdateFireTime(int id)
+        public void UpdateFireTime(string id)
         {
             if (_enemyList.ContainsKey(id))
             {
@@ -386,9 +386,9 @@ namespace Radar
                 {
                     continue;
                 }
-                if (!_enemyList.ContainsKey(enemyPlayer.Id))
+                if (!_enemyList.ContainsKey(enemyPlayer.ProfileId))
                 {
-                    _enemyList.Add(enemyPlayer.Id, new BlipPlayer(enemyPlayer));
+                    _enemyList.Add(enemyPlayer.ProfileId, new BlipPlayer(enemyPlayer));
                 }
             }
             return 0;
