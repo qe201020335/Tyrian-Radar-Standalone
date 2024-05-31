@@ -7,8 +7,6 @@ using UnityEngine.UI;
 using EFT.Interactive;
 using System.Linq;
 using BepInEx.Configuration;
-using Aki.Reflection.Utils;
-using System.Data;
 
 namespace Radar
 {
@@ -76,35 +74,19 @@ namespace Radar
             Radar.Log.LogInfo("Radar loaded");
 
             if (Radar.radarEnableCompassConfig.Value)
-            {
                 InitCompassRadar();
-            }
             else
-            {
                 InitNormalRadar();
-            }
         }
 
-        private RenderTexture radarRenderTexture = new RenderTexture(256, 256, 16);
-        private GameObject radarCameraObject = new GameObject("RadarCamera");
-        private Camera? radarCamera;
         private bool compassOn = false;
         private GameObject? compassGlass;
-
-        private void LateUpdate()
-        {
-            if (compassOn && compassGlass != null && radarCamera != null)
-            {
-                Vector3 compassPosition = compassGlass.transform.position;
-                radarCamera.transform.position = compassPosition;
-                radarCamera.transform.rotation = compassGlass.transform.rotation;
-            }
-        }
 
         private void InitNormalRadar()
         {
             compassGlass = null;
             Canvas radarCanvas = GetComponentInChildren<Canvas>();
+            RadarBase.SetActive(true);
             if (radarCanvas != null)
             {
                 radarCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -115,50 +97,40 @@ namespace Radar
             transform.rotation = Quaternion.identity;
 
             RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
-            RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
             RadarBaseTransform.rotation = Quaternion.identity;
+            RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
             RadarBorderTransform.rotation = Quaternion.identity;
+
+            Debug.LogError($"^ {transform.position} {transform.localPosition} {transform.rotation} {transform.localRotation} {transform.localScale}");
+            Debug.LogError($"^ {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
+        }
+
+        public void SetCompassParent(bool enable)
+        {
+            if (enable && compassGlass != null)
+                transform.parent = compassGlass.transform;
+            else
+                transform.parent = null;
         }
 
         private void InitCompassRadar()
         {
-            if (radarCamera == null)
-            {
-                // Create a RenderTexture
-                radarRenderTexture.Create();
-
-                // Create a new camera for rendering the radar HUD
-                radarCamera = radarCameraObject.AddComponent<Camera>();
-
-                // Configure the camera
-                radarCamera.targetTexture = radarRenderTexture;
-                radarCamera.orthographic = true;
-                radarCamera.orthographicSize = 0.1f;
-                radarCamera.clearFlags = CameraClearFlags.SolidColor;
-                radarCamera.backgroundColor = Color.clear;
-
-                // Position the camera to render your radar HUD
-                radarCamera.transform.position = new Vector3(0, 0, 0);
-                radarCamera.transform.rotation = Quaternion.identity;
-                radarCamera.transform.localScale = Vector3.one * 0.001f;
-                radarCamera.fieldOfView = Camera.main.fieldOfView;
-            }
-
             // Ensure the Canvas is set to World Space
             Canvas radarCanvas = GetComponentInChildren<Canvas>();
             if (radarCanvas != null)
             {
                 radarCanvas.renderMode = RenderMode.WorldSpace;
-                radarCanvas.worldCamera = radarCamera;
+                radarCanvas.worldCamera = Camera.main;
             }
 
             // Set the parent of RadarHUD
-            transform.SetParent(radarCamera.transform, false);
+            SetCompassParent(true);
             transform.localPosition = Vector3.zero;
             transform.localRotation = Quaternion.identity;
-            RadarBaseTransform.localPosition = new Vector3(0, 0, 0.25f);
+            RadarBaseTransform.localPosition = new Vector3(0, 0, 0.001f);
             RadarBaseTransform.localRotation = Quaternion.Euler(0, -180, 0);
-            RadarBaseTransform.localScale = Vector3.one * 0.125f;
+            RadarBaseTransform.localScale = Vector3.one * 0.000123f;
+            RadarBorderTransform.localRotation = Quaternion.identity;
         }
         
         private void OnEnable()
@@ -166,7 +138,7 @@ namespace Radar
             Radar.Instance.Config.SettingChanged += UpdateRadarSettings;
             UpdateRadarSettings();
         }
-        
+
         private void OnDisable()
         {
             Radar.Instance.Config.SettingChanged -= UpdateRadarSettings;
@@ -210,13 +182,9 @@ namespace Radar
             if (e == null || e.ChangedSetting == Radar.radarEnableCompassConfig)
             {
                 if (Radar.radarEnableCompassConfig.Value)
-                {
                     InitCompassRadar();
-                }
                 else
-                {
                     InitNormalRadar();
-                }
             }
 
             if (!Radar.radarEnableCompassConfig.Value)
@@ -230,13 +198,6 @@ namespace Radar
                 {
                     RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
                 }
-            }
-
-            if (e != null && (e.ChangedSetting == Radar.testValue1 || e.ChangedSetting == Radar.testValue2 || e.ChangedSetting == Radar.testValue3))
-            {
-                //transform.localRotation = Quaternion.Euler(Radar.testValue1.Value, Radar.testValue2.Value, Radar.testValue3.Value);
-                radarCamera.orthographicSize = Radar.testValue1.Value;
-                Debug.LogError($"Fov: {radarCamera.fieldOfView} {radarCamera.GetGateFittedFieldOfView()}");
             }
 
             if (e == null || e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold)
@@ -260,7 +221,6 @@ namespace Radar
                         if (loc.y > yMax)
                             yMax = loc.y;
                     }
-                    //Debug.LogError($"Add {_lootCustomObject.Count} items, Min/Max x/z: {xMin} {xMax} {yMin} {yMax}");
                     _lootTree = new Quadtree(Rect.MinMaxRect(xMin * 1.1f, yMin * 1.1f, xMax * 1.1f, yMax * 1.1f));
                     foreach (BlipLoot loot in _lootCustomObject)
                     {
@@ -345,10 +305,9 @@ namespace Radar
             {
                 RadarBorderTransform.eulerAngles = new Vector3(0, 0, transform.parent.transform.eulerAngles.y);
             }
-            
+
             UpdateLoot();
-            long rslt = UpdateActivePlayer();
-            UpdateRadar(rslt != -1);
+            UpdateRadar(UpdateActivePlayer() != -1);
 
             if (Radar.radarEnableCompassConfig.Value)
             {
@@ -358,25 +317,24 @@ namespace Radar
                 {
                     compassOn = true;
                     RadarBase.SetActive(true);
+                    SetCompassParent(true);
                 }
                 if (!compassInHand && compassOn)
                 {
-
                     compassOn = false;
                     RadarBase.SetActive(false);
+                    SetCompassParent(false);
                 }
 
                 if (compassOn && compassGlass == null)
                 {
                     compassGlass = GameObject.Find("compas_glass_LOD0");
-                    //if (compassGlass != null)
-                    //{
-                    //    Renderer compassRenderer = compassGlass.GetComponent<Renderer>();
-                    //    if (compassRenderer != null)
-                    //    {
-                    //        compassRenderer.material.mainTexture = radarRenderTexture;
-                    //    }
-                    //}
+                    if (compassGlass != null && transform.parent == null)
+                    {
+                        transform.parent = compassGlass.transform;
+                        transform.localPosition = Vector3.zero;
+                        transform.localRotation = Quaternion.identity;
+                    }
                 }
             }
         }

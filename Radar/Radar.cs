@@ -53,11 +53,6 @@ namespace Radar
         public static ConfigEntry<Color> lootBlipColor;
         public static ConfigEntry<Color> backgroundColor;
 
-        public static ConfigEntry<float> testValue1;
-        public static ConfigEntry<float> testValue2;
-        public static ConfigEntry<float> testValue3;
-
-
         internal static ManualLogSource Log { get; private set; } = null!;
 
         private void Awake()
@@ -109,14 +104,6 @@ namespace Radar
                 new ConfigDescription(Locales.GetTranslatedString("radar_scan_interval_info"), new AcceptableValueRange<float>(0.1f, 30f)));
             radarLootThreshold = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_loot_threshold"), 30000f,
                 new ConfigDescription(Locales.GetTranslatedString("radar_loot_threshold_info"), new AcceptableValueRange<float>(5000f, 100000f)));
-
-            var lim = 5f;
-            testValue1 = Config.Bind<float>(radarSettings, "v1", 0,
-                new ConfigDescription("v1", new AcceptableValueRange<float>(-lim, lim)));
-            testValue2 = Config.Bind<float>(radarSettings, "v2", 0,
-                new ConfigDescription("v2", new AcceptableValueRange<float>(-lim, lim)));
-            testValue3 = Config.Bind<float>(radarSettings, "v3", 0,
-                new ConfigDescription("v3", new AcceptableValueRange<float>(-lim, lim)));
 
             bossBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_boss_blip_color"), new Color(1f, 0f, 0f));
             scavBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_scav_blip_color"), new Color(0f, 1f, 0f));
