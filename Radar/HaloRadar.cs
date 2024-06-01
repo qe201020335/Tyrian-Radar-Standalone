@@ -12,6 +12,8 @@ namespace Radar
 {
     public class HaloRadar : MonoBehaviour
     {
+        private bool debugInfo = false;
+
         private GameWorld _gameWorld = null!;
         private Player _player = null!;
 
@@ -38,6 +40,9 @@ namespace Radar
         // FPS Camera (this.transform.parent) -> RadarHUD (this.transform) -> RadarBaseTransform (transform.Find("Radar").transform) -> RadarBorderTransform
         private void Awake()
         {
+            if (debugInfo)
+                Debug.LogError("# Awake");
+
             if (!Singleton<GameWorld>.Instantiated)
             {
                 Radar.Log.LogWarning("GameWorld singleton not found.");
@@ -72,7 +77,9 @@ namespace Radar
             //Debug.LogError($"& BOD: {RadarBorderTransform.position} {RadarBorderTransform.localPosition} {RadarBorderTransform.rotation} {RadarBorderTransform.localRotation} {RadarBorderTransform.localScale}");
 
             Radar.Log.LogInfo("Radar loaded");
-
+        }
+        private void InitRadar()
+        {
             if (Radar.radarEnableCompassConfig.Value)
                 InitCompassRadar();
             else
@@ -84,6 +91,8 @@ namespace Radar
 
         private void InitNormalRadar()
         {
+            if (debugInfo)
+                Debug.LogError("# InitNormalRadar");
             compassGlass = null;
             Canvas radarCanvas = GetComponentInChildren<Canvas>();
             RadarBase.SetActive(true);
@@ -101,8 +110,8 @@ namespace Radar
             RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
             RadarBorderTransform.rotation = Quaternion.identity;
 
-            Debug.LogError($"^ {transform.position} {transform.localPosition} {transform.rotation} {transform.localRotation} {transform.localScale}");
-            Debug.LogError($"^ {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
+            //Debug.LogError($"^ {transform.position} {transform.localPosition} {transform.rotation} {transform.localRotation} {transform.localScale}");
+            //Debug.LogError($"^ {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
         }
 
         public void SetCompassParent(bool enable)
@@ -110,11 +119,13 @@ namespace Radar
             if (enable && compassGlass != null)
                 transform.parent = compassGlass.transform;
             else
-                transform.parent = null;
+                transform.parent = GameObject.Find("FPS Camera").transform;
         }
 
         private void InitCompassRadar()
         {
+            if (debugInfo)
+                Debug.LogError("# InitCompassRadar");
             // Ensure the Canvas is set to World Space
             Canvas radarCanvas = GetComponentInChildren<Canvas>();
             if (radarCanvas != null)
@@ -135,12 +146,17 @@ namespace Radar
         
         private void OnEnable()
         {
+            if (debugInfo)
+                Debug.LogError("# OnEnable");
+            InitRadar();
             Radar.Instance.Config.SettingChanged += UpdateRadarSettings;
             UpdateRadarSettings();
         }
 
         private void OnDisable()
         {
+            if (debugInfo)
+                Debug.LogError("# OnDisable");
             Radar.Instance.Config.SettingChanged -= UpdateRadarSettings;
         }
 
@@ -179,12 +195,9 @@ namespace Radar
                 transform.Find("Radar/RadarBackground").GetComponent<Image>().color = Radar.backgroundColor.Value;
             }
 
-            if (e == null || e.ChangedSetting == Radar.radarEnableCompassConfig)
+            if (e != null && e.ChangedSetting == Radar.radarEnableCompassConfig)
             {
-                if (Radar.radarEnableCompassConfig.Value)
-                    InitCompassRadar();
-                else
-                    InitNormalRadar();
+                InitRadar();
             }
 
             if (!Radar.radarEnableCompassConfig.Value)
@@ -301,6 +314,7 @@ namespace Radar
 
         private void Update()
         {
+            if (_player == null) return;
             if (!Radar.radarEnableCompassConfig.Value)
             {
                 RadarBorderTransform.eulerAngles = new Vector3(0, 0, transform.parent.transform.eulerAngles.y);
@@ -329,7 +343,7 @@ namespace Radar
                 if (compassOn && compassGlass == null)
                 {
                     compassGlass = GameObject.Find("compas_glass_LOD0");
-                    if (compassGlass != null && transform.parent == null)
+                    if (compassGlass != null && transform.parent != compassGlass.transform)
                     {
                         transform.parent = compassGlass.transform;
                         transform.localPosition = Vector3.zero;
