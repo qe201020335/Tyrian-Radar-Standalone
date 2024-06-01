@@ -30,9 +30,9 @@ namespace Radar
             return (root == null) ? 0 : root.Count();
         }
 
-        public void Remove(Vector2 point, LootItem item)
+        public void Remove(Vector2 point, string id)
         {
-            root.Remove(point, item);
+            root.Remove(point, id);
         }
 
         public void Clear()
@@ -98,7 +98,7 @@ namespace Radar
             }
         }
 
-        public void Remove(Vector2 point, LootItem item)
+        public void Remove(Vector2 point, string id)
         {
             if (children[0] != null)
             {
@@ -106,7 +106,7 @@ namespace Radar
                 {
                     if (child.bounds.Contains(point))
                     {
-                        child.Remove(point, item);
+                        child.Remove(point, id);
                         break;
                     }
                 }
@@ -115,7 +115,7 @@ namespace Radar
             {
                 foreach (var obj in objects)
                 {
-                    if (obj.obj._item == item)
+                    if (obj.obj._id == id)
                     {
                         objects.Remove(obj);
                         break;

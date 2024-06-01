@@ -7,6 +7,9 @@ using UnityEngine.UI;
 using EFT.Interactive;
 using System.Linq;
 using BepInEx.Configuration;
+using EFT.InventoryLogic;
+using System.ComponentModel;
+using System;
 
 namespace Radar
 {
@@ -33,9 +36,14 @@ namespace Radar
         private readonly Dictionary<string, BlipPlayer> _enemyList = new Dictionary<string, BlipPlayer>();
 
         private readonly List<BlipLoot> _lootCustomObject = new List<BlipLoot>();
+        private HashSet<string> _lootInList = new HashSet<string>();
+        private Dictionary<string, Transform> _containerTransforms = new Dictionary<string, Transform>();
         private Quadtree? _lootTree = null;
         private List<BlipLoot>? _activeLootOnRadar = null;
         private List<BlipLoot> _lootToHide = new List<BlipLoot>();
+
+        private HashSet<string> _containerSet = new HashSet<string>(); 
+        
 
         // FPS Camera (this.transform.parent) -> RadarHUD (this.transform) -> RadarBaseTransform (transform.Find("Radar").transform) -> RadarBorderTransform
         private void Awake()
@@ -171,7 +179,7 @@ namespace Radar
             {
                 foreach (var loot in _lootCustomObject)
                 {
-                    loot.DestoryLoot();
+                    loot.DestoryBlip();
                 }
                 _lootCustomObject.Clear();
             }
@@ -218,49 +226,97 @@ namespace Radar
                 if (Radar.radarEnableLootConfig.Value)
                 {
                     ClearLoot();
-                    // Init loot items
-                    var allLoot = _gameWorld.LootItems;
+
                     float xMin = 99999, xMax = -99999, yMin = 99999, yMax = -99999;
-                    foreach (LootItem loot in allLoot.GetValuesEnumerator())
+                    var allItenOwner = _gameWorld.ItemOwners;
+                    foreach (var item in allItenOwner)
                     {
-                        AddLoot(loot);
-                        Vector2 loc = new Vector2(loot.TrackableTransform.position.x, loot.TrackableTransform.position.z);
-                        if (loc.x < xMin)
-                            xMin = loc.x;
-                        if (loc.x > xMax)
-                            xMax = loc.x;
-                        if (loc.y < yMin)
-                            yMin = loc.y;
-                        if (loc.y > yMax)
-                            yMax = loc.y;
+                        // 55d7217a4bdc2d86028b456d is the player inventory
+                        if (!item.Key.RootItem.Name.StartsWith("55d7217a4bdc2d86028b456d") && item.Value.Transform != null)
+                        {
+                            AddLoot(item.Key.ID, item.Key.Items.First(), item.Value.Transform);
+                            if (item.Key.Items.First().IsContainer && !_containerSet.Contains(item.Key.ID))
+                            {
+                                //Debug.LogError($"Add event for: {item.Key.ID} {item.Key.ContainerName}");
+                                item.Key.RemoveItemEvent += (args) => OnContainerRemoveItemEvent(item.Key, args);
+                                item.Key.AddItemEvent += (args) => OnContainerAddItemEvent(item.Key, args);
+                                _containerSet.Add(item.Key.ID);
+                                _containerTransforms.Add(item.Key.ID, item.Value.Transform);
+                            }
+                            
+                            var loc = item.Value.Transform.position;
+                            if (loc.x < xMin)
+                                xMin = loc.x;
+                            if (loc.x > xMax)
+                                xMax = loc.x;
+                            if (loc.z < yMin)
+                                yMin = loc.z;
+                            if (loc.z > yMax)
+                                yMax = loc.z;
+                        }
+
+                        //Debug.LogError($"C ID: {item.Key.ID} {item.Key.ContainerName} {item.Key.RootItem.Name}");
+                        //if (item.Value.Transform != null)
+                        //    Debug.LogError($"\t P: {item.Value.Transform.position}");
                     }
                     _lootTree = new Quadtree(Rect.MinMaxRect(xMin * 1.1f, yMin * 1.1f, xMax * 1.1f, yMax * 1.1f));
                     foreach (BlipLoot loot in _lootCustomObject)
-                    {
                         _lootTree.Insert(loot);
-                    }
                 }
                 else
-                {
                     ClearLoot();
-                }
             }
         }
 
-        public void AddLoot(LootItem item, bool lazyUpdate = false, int key = 0)
+        private void OnContainerAddItemEvent(IItemOwner itemOwner, GEventArgs2 args)
         {
-            var price = ItemExtensions.GetBestPrice(item.Item);
-            
-            if (Radar.radarLootPerSlotConfig.Value)
+            // New item has high price &&  has not been added
+            if (CheckPrice(args.Item) && !_lootInList.Contains(itemOwner.ID))
+                AddLoot(itemOwner.ID, itemOwner.Items.First(), _containerTransforms[itemOwner.ID]);
+        }
+
+        private void OnContainerRemoveItemEvent(IItemOwner itemOwner, GEventArgs3 args)
+        {
+            if (CheckPrice(args.Item) && !CheckPrice(itemOwner.Items.First()))
             {
-                price /= item.Item.CalculateCellSize().X * item.Item.CalculateCellSize().Y;
+                RemoveLoot(itemOwner.ID);
+            }
+        }
+
+        private bool CheckPrice(Item item)
+        {
+            var highestPrice = 0;
+            if (item.IsContainer)
+            {
+                foreach (var subItem in item.GetAllItems())
+                {
+                    var price = ItemExtensions.GetBestPrice(subItem);
+                    if (Radar.radarLootPerSlotConfig.Value)
+                        price /= subItem.CalculateCellSize().X * subItem.CalculateCellSize().Y;
+
+                    if (price > highestPrice)
+                        highestPrice = price;
+                }
+            }
+            else
+            {
+                highestPrice = ItemExtensions.GetBestPrice(item);
+                if (Radar.radarLootPerSlotConfig.Value)
+                    highestPrice /= item.CalculateCellSize().X * item.CalculateCellSize().Y;
             }
 
-            if (price > Radar.radarLootThreshold.Value)
+            return highestPrice > Radar.radarLootThreshold.Value;
+        }
+
+        public void AddLoot(string id, Item item, Transform transform, bool lazyUpdate = false)
+        {
+            if (!item.Name.StartsWith("55d7217a4bdc2d86028b456d") && CheckPrice(item))
             {
-                var blip = new BlipLoot(item, lazyUpdate, key);
+                //Debug.LogError($"Add {item.IsContainer} {item.Name} {item.LocalizedName()} {transform.position}");
+                var blip = new BlipLoot(id, transform, lazyUpdate);
                 _lootCustomObject.Add(blip);
                 _lootTree?.Insert(blip);
+                _lootInList.Add(id);
             }
         }
 
@@ -272,23 +328,29 @@ namespace Radar
             }
         }
 
-        public void RemoveLoot(int key)
+        public void RemoveLootByKey(int key)
+        {
+            LootItem item = _gameWorld.LootItems.GetByKey(key);
+            RemoveLoot(item.ItemId);
+        }
+
+        public void RemoveLoot(string id)
         {
             Vector2 point = Vector2.zero;
-            LootItem item = _gameWorld.LootItems.GetByKey(key);
-
             foreach (var loot in _lootCustomObject)
             {
-                if (loot._key == key || loot._item == item)
+                if (loot._id == id)
                 {
                     point.x = loot.targetPosition.x;
                     point.y = loot.targetPosition.z;
-                    loot.DestoryLoot();
+                    loot.DestoryBlip();
                     _lootCustomObject.Remove(loot);
                     break;
                 }
             }
-            _lootTree?.Remove(point, item);
+            //Debug.LogError($"Remove Loot: {id}");
+            _lootTree?.Remove(point, id);
+            _lootInList.Remove(id);
         }
 
         private void TogglePulseAnimation(bool enable)

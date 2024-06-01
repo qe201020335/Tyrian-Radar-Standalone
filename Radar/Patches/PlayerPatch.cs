@@ -4,7 +4,7 @@ using EFT;
 using JetBrains.Annotations;
 using UnityEngine;
 
-namespace Radar
+namespace Radar.Patches
 {
     internal class PlayerOnMakingShotPatch : ModulePatch
     {
@@ -16,8 +16,8 @@ namespace Radar
         [PatchPostfix]
         static void PostFix(Player __instance, [NotNull] GInterface322 weapon, Vector3 force)
         {
-            var radar = InRaidRadarManager._radarGo.GetComponent<HaloRadar>();
-            radar.UpdateFireTime(__instance.ProfileId);
+            var radar = InRaidRadarManager._radarGo?.GetComponent<HaloRadar>();
+            radar?.UpdateFireTime(__instance.ProfileId);
         }
     }
 }

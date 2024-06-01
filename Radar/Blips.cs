@@ -1,19 +1,19 @@
 ﻿using EFT.Interactive;
 using EFT;
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
+using Item = EFT.InventoryLogic.Item;
 
 namespace Radar
 {
     public class BlipPlayer : Target
     {
-        private Player? _enemyPlayer = null;
+        private readonly Player _enemyPlayer;
         private bool _isDead = false;
         public BlipPlayer(Player enemyPlayer)
         {
-            this._enemyPlayer = enemyPlayer;
+            _enemyPlayer = enemyPlayer;
         }
 
         private void UpdateBlipImage()
@@ -40,7 +40,7 @@ namespace Radar
                     blipImage.sprite = AssetBundleManager.EnemyBlipDown;
                 }
                 // set blip color
-                switch (_enemyPlayer?.Profile.Info.Side)
+                switch (_enemyPlayer.Profile.Info.Side)
                 {
                     case EPlayerSide.Savage:
                         switch (_enemyPlayer.Profile.Info.Settings.Role)
@@ -124,18 +124,16 @@ namespace Radar
 
     public class BlipLoot : Target
     {
-        public LootItem _item;
-        public string _itemId;
+        public string _id;
+        public Transform _transform;
         private bool _lazyUpdate;
-        public int _key;
 
-        public BlipLoot(LootItem item, bool lazyUpdate = false, int key = 0)
+        public BlipLoot(string id, Transform transform, bool lazyUpdate = false)
         {
-            _item = item;
-            _itemId = item.ItemId;
+            _id = id;
+            _transform = transform;
+            targetPosition = transform.position;
             _lazyUpdate = lazyUpdate;
-            _key = key;
-            targetPosition = item.TrackableTransform.position;
         }
 
         private void UpdateBlipImage()
@@ -164,7 +162,7 @@ namespace Radar
         {
             if (_lazyUpdate)
             {
-                targetPosition = _item.TrackableTransform.position;
+                targetPosition = _transform.position;
                 _lazyUpdate = false;
             }
 
@@ -183,11 +181,6 @@ namespace Radar
                 //UpdateAlpha();
                 UpdatePosition(true);
             }
-        }
-
-        public void DestoryLoot()
-        {
-            this.DestoryBlip();
         }
     }
 

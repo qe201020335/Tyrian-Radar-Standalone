@@ -14,9 +14,9 @@ namespace Radar
 
         private void Awake()
         {
-            new GClass723PatchAdd().Enable();
-            new GClass723PatchRemove().Enable();
-            new PlayerOnMakingShotPatch().Enable();
+            new Patches.GClass723PatchAdd().Enable();
+            new Patches.GClass723PatchRemove().Enable();
+            new Patches.PlayerOnMakingShotPatch().Enable();
             var playerCamera = GameObject.Find("FPS Camera");
             if (playerCamera == null)
             {

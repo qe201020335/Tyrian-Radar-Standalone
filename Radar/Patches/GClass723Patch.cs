@@ -2,7 +2,7 @@
 using Aki.Reflection.Patching;
 using EFT.Interactive;
 
-namespace Radar
+namespace Radar.Patches
 {
     internal class GClass723PatchAdd : ModulePatch
     {
@@ -14,9 +14,9 @@ namespace Radar
         [PatchPostfix]
         static void PostFix(int key, LootItem value)
         {
-            //Debug.LogError($"Added called with key {key} and value {value}");
-            var radar = InRaidRadarManager._radarGo.GetComponent<HaloRadar>();
-            radar.AddLoot(value, true, key);
+            //UnityEngine.Debug.LogError($"Added called with key {key} and item id {value.ItemId} {value.Item.LocalizedName()}");
+            var radar = InRaidRadarManager._radarGo?.GetComponent<HaloRadar>();
+            radar?.AddLoot(value.ItemId, value.Item, value.TrackableTransform, true);
         }
     }
     internal class GClass723PatchRemove : ModulePatch
@@ -29,9 +29,9 @@ namespace Radar
         [PatchPrefix]
         static void PreFix(int key)
         {
-            //Debug.LogError($"Remove Called with key {key}");
-            var radar = InRaidRadarManager._radarGo.GetComponent<HaloRadar>();
-            radar.RemoveLoot(key);
+            //UnityEngine.Debug.LogError($"Remove Called with key {key}");
+            var radar = InRaidRadarManager._radarGo?.GetComponent<HaloRadar>();
+            radar?.RemoveLootByKey(key);
         }
     }
 }
