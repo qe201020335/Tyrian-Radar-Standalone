@@ -42,8 +42,7 @@ namespace Radar
         private List<BlipLoot>? _activeLootOnRadar = null;
         private List<BlipLoot> _lootToHide = new List<BlipLoot>();
 
-        private HashSet<string> _containerSet = new HashSet<string>(); 
-        
+        private HashSet<string> _containerSet = new HashSet<string>();
 
         // FPS Camera (this.transform.parent) -> RadarHUD (this.transform) -> RadarBaseTransform (transform.Find("Radar").transform) -> RadarBorderTransform
         private void Awake()
@@ -175,26 +174,25 @@ namespace Radar
                 _lootTree.Clear();
                 _lootTree = null;
             }
+
             if (_lootCustomObject.Count > 0)
             {
                 foreach (var loot in _lootCustomObject)
-                {
                     loot.DestoryBlip();
-                }
+
                 _lootCustomObject.Clear();
             }
         }
 
         private void UpdateRadarSettings(object? sender = null, SettingChangedEventArgs? e = null)
         {
+            //Debug.LogError($"$ Player: {_player.Position}");
             if (!gameObject.activeInHierarchy) return; // Don't update if the radar object is disabled
 
             _radarPulseInterval = Mathf.Max(1f, Radar.radarScanInterval.Value);
 
             if (e == null || e.ChangedSetting == Radar.radarEnablePulseConfig)
-            {
                 TogglePulseAnimation(Radar.radarEnablePulseConfig.Value);
-            }
 
             if (e != null && e.ChangedSetting == Radar.backgroundColor)
             {
@@ -204,21 +202,15 @@ namespace Radar
             }
 
             if (e != null && e.ChangedSetting == Radar.radarEnableCompassConfig)
-            {
                 InitRadar();
-            }
 
             if (!Radar.radarEnableCompassConfig.Value)
             {
                 if (e != null && !Radar.radarEnableCompassConfig.Value && (e.ChangedSetting == Radar.radarOffsetXConfig || e.ChangedSetting == Radar.radarOffsetYConfig))
-                {
                     RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
-                }
 
                 if (e != null && e.ChangedSetting == Radar.radarSizeConfig)
-                {
                     RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
-                }
             }
 
             if (e == null || e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold)
@@ -229,11 +221,20 @@ namespace Radar
 
                     float xMin = 99999, xMax = -99999, yMin = 99999, yMax = -99999;
                     var allItenOwner = _gameWorld.ItemOwners;
-                    foreach (var item in allItenOwner)
+                    // some containers will have duplicates (except drawer which should and do have 4 duplicates), here we need to filter them out
+                    // iterate the dict reversely because later container will substitute the previous one at the same position
+                    HashSet<Vector3> _duplicatePosition = new HashSet<Vector3>();
+                    foreach (var item in allItenOwner.Reverse())
                     {
                         // 55d7217a4bdc2d86028b456d is the player inventory
                         if (!item.Key.RootItem.Name.StartsWith("55d7217a4bdc2d86028b456d") && item.Value.Transform != null)
                         {
+                            // 578f87b7245977356274f2cd is drawer, which has exact 4 duplicates for each position
+                            if (!item.Key.ContainerName.StartsWith("578f87b7245977356274f2cd") && _duplicatePosition.Contains(item.Value.Transform.position))
+                                continue;
+                            else
+                                _duplicatePosition.Add(item.Value.Transform.position);
+
                             AddLoot(item.Key.ID, item.Key.Items.First(), item.Value.Transform);
                             if (item.Key.Items.First().IsContainer && !_containerSet.Contains(item.Key.ID))
                             {
@@ -262,9 +263,7 @@ namespace Radar
                     _lootTree = new Quadtree(Rect.MinMaxRect(xMin * 1.1f, yMin * 1.1f, xMax * 1.1f, yMax * 1.1f));
                     foreach (BlipLoot loot in _lootCustomObject)
                         _lootTree.Insert(loot);
-                }
-                else
-                    ClearLoot();
+                } else ClearLoot();
             }
         }
 
@@ -278,9 +277,7 @@ namespace Radar
         private void OnContainerRemoveItemEvent(IItemOwner itemOwner, GEventArgs3 args)
         {
             if (CheckPrice(args.Item) && !CheckPrice(itemOwner.Items.First()))
-            {
                 RemoveLoot(itemOwner.ID);
-            }
         }
 
         private bool CheckPrice(Item item)
@@ -291,6 +288,7 @@ namespace Radar
                 foreach (var subItem in item.GetAllItems())
                 {
                     var price = ItemExtensions.GetBestPrice(subItem);
+                    //Debug.LogError($"\tTry price: {subItem.LocalizedName()} {price}");
                     if (Radar.radarLootPerSlotConfig.Value)
                         price /= subItem.CalculateCellSize().X * subItem.CalculateCellSize().Y;
 
@@ -323,9 +321,7 @@ namespace Radar
         public void UpdateFireTime(string id)
         {
             if (_enemyList.ContainsKey(id))
-            {
                 _enemyList[id].UpdateLastFireTime(Time.time);
-            }
         }
 
         public void RemoveLootByKey(int key)
@@ -359,9 +355,7 @@ namespace Radar
             {
                 // always create a new coroutine
                 if (_pulseCoroutine != null)
-                {
                     StopCoroutine(_pulseCoroutine);
-                }
 
                 _pulseCoroutine = StartCoroutine(PulseCoroutine());
             }
@@ -377,10 +371,9 @@ namespace Radar
         private void Update()
         {
             if (_player == null) return;
+
             if (!Radar.radarEnableCompassConfig.Value)
-            {
                 RadarBorderTransform.eulerAngles = new Vector3(0, 0, transform.parent.transform.eulerAngles.y);
-            }
 
             UpdateLoot();
             UpdateRadar(UpdateActivePlayer() != -1);
@@ -442,30 +435,21 @@ namespace Radar
                 interval = 0.1f;
                 
             if (Time.time - RadarLastUpdateTime < interval)
-            {
                 return -1;
-            }
             else
-            {
                 RadarLastUpdateTime = Time.time;
-            }
             IEnumerable<Player> allPlayers = _gameWorld.AllPlayersEverExisted;
 
             if (allPlayers.Count() == _enemyList.Count + 1)
-            {
                 return -2;
-            }
 
             foreach (Player enemyPlayer in allPlayers)
             {
                 if (enemyPlayer == null || enemyPlayer == _player)
-                {
                     continue;
-                }
+
                 if (!_enemyList.ContainsKey(enemyPlayer.ProfileId))
-                {
                     _enemyList.Add(enemyPlayer.ProfileId, new BlipPlayer(enemyPlayer));
-                }
             }
             return 0;
         }
@@ -473,9 +457,8 @@ namespace Radar
         private void UpdateLoot()
         {
             if (Time.time - RadarLastUpdateTime < Radar.radarScanInterval.Value)
-            {
                 return;
-            }
+
             Vector2 center = new Vector2(_player.Transform.position.x, _player.Transform.position.z);
             var latestActiveLootOnRadar = _lootTree?.QueryRange(center, Radar.radarOuterRangeConfig.Value);
             _lootToHide.Clear();
@@ -484,9 +467,7 @@ namespace Radar
                 foreach (var old in _activeLootOnRadar)
                 {
                     if (latestActiveLootOnRadar == null || !latestActiveLootOnRadar.Contains(old))
-                    {
                         _lootToHide.Add(old);
-                    }
                 }
             }
 
@@ -499,21 +480,15 @@ namespace Radar
             Target.setPlayerPosition(_player.Transform.position);
             Target.setRadarRange(Radar.radarInnerRangeConfig.Value, Radar.radarOuterRangeConfig.Value);
             foreach (var obj in _enemyList)
-            {
                 obj.Value.Update(positionUpdate);
-            }
 
             foreach (var obj in _lootToHide)
-            {
                 obj.Update(false);
-            }
 
             if (_activeLootOnRadar != null)
             {
                 foreach (var obj in _activeLootOnRadar)
-                {
                     obj.Update(true);
-                }
             }
         }
     }

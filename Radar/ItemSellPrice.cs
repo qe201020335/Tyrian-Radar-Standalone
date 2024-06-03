@@ -8,6 +8,7 @@ using System.Reflection;
 using UnityEngine;
 using Aki.Common.Http;
 using Newtonsoft.Json;
+using System;
 
 internal static class TraderClassExtensions
 {
@@ -110,7 +111,11 @@ class ItemExtensions
         var price = 0;
         if (hasPlayerFleaPrice)
         {
-            price = int.Parse(response);
+            try
+            {
+                price = int.Parse(response);
+            }
+            catch (FormatException) { }
         }
         fleaCache[item.Name] = price;
         return price;
