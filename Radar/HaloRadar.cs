@@ -10,6 +10,8 @@ using BepInEx.Configuration;
 using EFT.InventoryLogic;
 using System.ComponentModel;
 using System;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace Radar
 {
@@ -91,6 +93,9 @@ namespace Radar
                 InitCompassRadar();
             else
                 InitNormalRadar();
+
+            if (Radar.radarEnableLootConfig.Value)
+                UpdateLootList();
         }
 
         private bool compassOn = false;
@@ -213,58 +218,64 @@ namespace Radar
                     RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
             }
 
-            if (e == null || e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold)
+            if (e != null && (e.ChangedSetting == Radar.radarEnableLootConfig || e.ChangedSetting == Radar.radarLootThreshold))
             {
                 if (Radar.radarEnableLootConfig.Value)
-                {
+                    UpdateLootList();
+                else
                     ClearLoot();
-
-                    float xMin = 99999, xMax = -99999, yMin = 99999, yMax = -99999;
-                    var allItenOwner = _gameWorld.ItemOwners;
-                    // some containers will have duplicates (except drawer which should and do have 4 duplicates), here we need to filter them out
-                    // iterate the dict reversely because later container will substitute the previous one at the same position
-                    HashSet<Vector3> _duplicatePosition = new HashSet<Vector3>();
-                    foreach (var item in allItenOwner.Reverse())
-                    {
-                        // 55d7217a4bdc2d86028b456d is the player inventory
-                        if (!item.Key.RootItem.Name.StartsWith("55d7217a4bdc2d86028b456d") && item.Value.Transform != null)
-                        {
-                            // 578f87b7245977356274f2cd is drawer, which has exact 4 duplicates for each position
-                            if (!item.Key.ContainerName.StartsWith("578f87b7245977356274f2cd") && _duplicatePosition.Contains(item.Value.Transform.position))
-                                continue;
-                            else
-                                _duplicatePosition.Add(item.Value.Transform.position);
-
-                            AddLoot(item.Key.ID, item.Key.Items.First(), item.Value.Transform);
-                            if (item.Key.Items.First().IsContainer && !_containerSet.Contains(item.Key.ID))
-                            {
-                                //Debug.LogError($"Add event for: {item.Key.ID} {item.Key.ContainerName}");
-                                item.Key.RemoveItemEvent += (args) => OnContainerRemoveItemEvent(item.Key, args);
-                                item.Key.AddItemEvent += (args) => OnContainerAddItemEvent(item.Key, args);
-                                _containerSet.Add(item.Key.ID);
-                                _containerTransforms.Add(item.Key.ID, item.Value.Transform);
-                            }
-                            
-                            var loc = item.Value.Transform.position;
-                            if (loc.x < xMin)
-                                xMin = loc.x;
-                            if (loc.x > xMax)
-                                xMax = loc.x;
-                            if (loc.z < yMin)
-                                yMin = loc.z;
-                            if (loc.z > yMax)
-                                yMax = loc.z;
-                        }
-
-                        //Debug.LogError($"C ID: {item.Key.ID} {item.Key.ContainerName} {item.Key.RootItem.Name}");
-                        //if (item.Value.Transform != null)
-                        //    Debug.LogError($"\t P: {item.Value.Transform.position}");
-                    }
-                    _lootTree = new Quadtree(Rect.MinMaxRect(xMin * 1.1f, yMin * 1.1f, xMax * 1.1f, yMax * 1.1f));
-                    foreach (BlipLoot loot in _lootCustomObject)
-                        _lootTree.Insert(loot);
-                } else ClearLoot();
             }
+        }
+
+        private void UpdateLootList()
+        {
+            ClearLoot();
+
+            float xMin = 99999, xMax = -99999, yMin = 99999, yMax = -99999;
+            var allItemOwner = _gameWorld.ItemOwners;
+
+            // some containers will have duplicates (except drawer which should and do have 4 duplicates), here we need to filter them out
+            // iterate the dict reversely because later container will substitute the previous one at the same position
+            HashSet<Vector3> _duplicatePosition = new HashSet<Vector3>();
+            foreach (var item in allItemOwner.Reverse())
+            {
+                // 55d7217a4bdc2d86028b456d is the player inventory
+                if (!item.Key.RootItem.Name.StartsWith("55d7217a4bdc2d86028b456d") && item.Value.Transform != null)
+                {
+                    // 578f87b7245977356274f2cd is drawer, which has exact 4 duplicates for each position
+                    if (!item.Key.ContainerName.StartsWith("578f87b7245977356274f2cd") && _duplicatePosition.Contains(item.Value.Transform.position))
+                        continue;
+                    else
+                        _duplicatePosition.Add(item.Value.Transform.position);
+
+                    AddLoot(item.Key.ID, item.Key.Items.First(), item.Value.Transform);
+                    if (item.Key.Items.First().IsContainer && !_containerSet.Contains(item.Key.ID))
+                    {
+                        //Debug.LogError($"Add event for: {item.Key.ID} {item.Key.ContainerName}");
+                        item.Key.RemoveItemEvent += (args) => OnContainerRemoveItemEvent(item.Key, args);
+                        item.Key.AddItemEvent += (args) => OnContainerAddItemEvent(item.Key, args);
+                        _containerSet.Add(item.Key.ID);
+                        _containerTransforms.Add(item.Key.ID, item.Value.Transform);
+                    }
+
+                    var loc = item.Value.Transform.position;
+                    if (loc.x < xMin)
+                        xMin = loc.x;
+                    if (loc.x > xMax)
+                        xMax = loc.x;
+                    if (loc.z < yMin)
+                        yMin = loc.z;
+                    if (loc.z > yMax)
+                        yMax = loc.z;
+                }
+
+                //Debug.LogError($"C ID: {item.Key.ID} {item.Key.ContainerName} {item.Key.RootItem.Name}");
+                //if (item.Value.Transform != null)
+                //    Debug.LogError($"\t P: {item.Value.Transform.position}");
+            }
+            _lootTree = new Quadtree(Rect.MinMaxRect(xMin * 1.1f, yMin * 1.1f, xMax * 1.1f, yMax * 1.1f));
+            foreach (BlipLoot loot in _lootCustomObject)
+                _lootTree.Insert(loot);
         }
 
         private void OnContainerAddItemEvent(IItemOwner itemOwner, GEventArgs2 args)

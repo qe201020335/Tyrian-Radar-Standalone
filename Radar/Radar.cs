@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Radar
 {
-    [BepInPlugin("Tyrian.Radar", "Radar", "1.1.4")]
+    [BepInPlugin("Tyrian.Radar", "Radar", "1.1.5")]
     public class Radar : BaseUnityPlugin
     {
         internal static Radar Instance {get; private set;}
