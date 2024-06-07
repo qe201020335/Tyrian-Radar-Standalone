@@ -9,6 +9,7 @@ using UnityEngine;
 using Aki.Common.Http;
 using Newtonsoft.Json;
 using System;
+using System.Threading.Tasks;
 
 internal static class TraderClassExtensions
 {
@@ -106,6 +107,7 @@ class ItemExtensions
         {
             return fleaCache[item.Name];
         }
+
         var response = RequestHandler.PostJson("/LootValue/GetItemLowestFleaPrice", JsonConvert.SerializeObject(new FleaPriceRequest(item.TemplateId)));
         bool hasPlayerFleaPrice = !(string.IsNullOrEmpty(response) || response == "null");
         var price = 0;
