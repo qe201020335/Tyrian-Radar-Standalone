@@ -191,7 +191,6 @@ namespace Radar
 
         private void UpdateRadarSettings(object? sender = null, SettingChangedEventArgs? e = null)
         {
-            //Debug.LogError($"$ Player: {_player.Position}");
             if (!gameObject.activeInHierarchy) return; // Don't update if the radar object is disabled
 
             _radarPulseInterval = Mathf.Max(1f, Radar.radarScanInterval.Value);
@@ -211,10 +210,12 @@ namespace Radar
 
             if (!Radar.radarEnableCompassConfig.Value)
             {
-                if (e != null && !Radar.radarEnableCompassConfig.Value && (e.ChangedSetting == Radar.radarOffsetXConfig || e.ChangedSetting == Radar.radarOffsetYConfig))
+                if (e == null || e.ChangedSetting == Radar.radarOffsetXConfig || e.ChangedSetting == Radar.radarOffsetYConfig)
+                {
                     RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
+                }
 
-                if (e != null && e.ChangedSetting == Radar.radarSizeConfig)
+                if (e == null || e.ChangedSetting == Radar.radarSizeConfig)
                     RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
             }
 
