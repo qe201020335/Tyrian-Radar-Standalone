@@ -30,6 +30,7 @@ namespace Radar
         
         private Coroutine? _pulseCoroutine;
         private float _radarPulseInterval = 1f;
+        private float _defaultScale = 1f;
         
         private Vector3 _radarScaleStart;
 
@@ -114,9 +115,10 @@ namespace Radar
                 radarCanvas.worldCamera = null;
             }
             transform.SetParent(GameObject.Find("FPS Camera").transform);
-            transform.localScale = Vector3.one * 1.3333333f; // 1.333f is the default localScale for transform
+            
+            // setting this will cause radar location to be changed when game start
+            //transform.localScale = Vector3.one * 1.3333333f; // 1.333f is the default localScale for transform
             transform.rotation = Quaternion.identity;
-
             RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
             RadarBaseTransform.rotation = Quaternion.identity;
             RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
