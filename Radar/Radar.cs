@@ -13,8 +13,8 @@ namespace Radar
     [BepInPlugin("Tyrian.Radar", "Radar", "1.1.5")]
     public class Radar : BaseUnityPlugin
     {
-        internal static Radar Instance {get; private set;}
-        
+        internal static Radar Instance { get; private set; }
+
         public static Dictionary<GameObject, HashSet<Material>> objectsMaterials = new Dictionary<GameObject, HashSet<Material>>();
 
         const string baseSettings = "Base Settings";
@@ -39,10 +39,10 @@ namespace Radar
         public static ConfigEntry<float> radarYHeightThreshold;
         public static ConfigEntry<float> radarOffsetYConfig;
         public static ConfigEntry<float> radarOffsetXConfig;
-        public static ConfigEntry<float> radarOuterRangeConfig;
-        public static ConfigEntry<float> radarInnerRangeConfig;
+        public static ConfigEntry<int> radarOuterRangeConfig;
+        public static ConfigEntry<int> radarInnerRangeConfig;
         public static ConfigEntry<float> radarScanInterval;
-        public static ConfigEntry<float> radarLootThreshold;
+        public static ConfigEntry<int> radarLootThreshold;
         public static ConfigEntry<bool> radarLootPerSlotConfig;
 
         public static ConfigEntry<Color> bossBlipColor;
@@ -96,14 +96,14 @@ namespace Radar
                 new ConfigDescription(Locales.GetTranslatedString("radar_x_position_info"), new AcceptableValueRange<float>(-4000f, 4000f)));
             radarOffsetYConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_y_position"), 150f,
                 new ConfigDescription(Locales.GetTranslatedString("radar_y_position_info"), new AcceptableValueRange<float>(-4000f, 4000f)));
-            radarOuterRangeConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_outer_range"), 128f,
-                new ConfigDescription(Locales.GetTranslatedString("radar_outer_range_info"), new AcceptableValueRange<float>(32f, 1024f)));
-            radarInnerRangeConfig = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_inner_range"), 0f,
-                new ConfigDescription(Locales.GetTranslatedString("radar_inner_range_info"), new AcceptableValueRange<float>(0f, 64f)));
+            radarOuterRangeConfig = Config.Bind<int>(radarSettings, Locales.GetTranslatedString("radar_outer_range"), 128,
+                new ConfigDescription(Locales.GetTranslatedString("radar_outer_range_info"), new AcceptableValueRange<int>(32, 1024)));
+            radarInnerRangeConfig = Config.Bind<int>(radarSettings, Locales.GetTranslatedString("radar_inner_range"), 0,
+                new ConfigDescription(Locales.GetTranslatedString("radar_inner_range_info"), new AcceptableValueRange<int>(0, 64)));
             radarScanInterval = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_scan_interval"), 1f,
                 new ConfigDescription(Locales.GetTranslatedString("radar_scan_interval_info"), new AcceptableValueRange<float>(0.1f, 30f)));
-            radarLootThreshold = Config.Bind<float>(radarSettings, Locales.GetTranslatedString("radar_loot_threshold"), 30000f,
-                new ConfigDescription(Locales.GetTranslatedString("radar_loot_threshold_info"), new AcceptableValueRange<float>(5000f, 200000f)));
+            radarLootThreshold = Config.Bind<int>(radarSettings, Locales.GetTranslatedString("radar_loot_threshold"), 30000,
+                new ConfigDescription(Locales.GetTranslatedString("radar_loot_threshold_info"), new AcceptableValueRange<int>(5000, 200000)));
 
             bossBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_boss_blip_color"), new Color(1f, 0f, 0f));
             scavBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_scav_blip_color"), new Color(0f, 1f, 0f));
@@ -112,9 +112,9 @@ namespace Radar
             corpseBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_corpse_blip_color"), new Color(0.5f, 0.5f, 0.5f));
             lootBlipColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_loot_blip_color"), new Color(0.9f, 0.5f, 0.5f));
             backgroundColor = Config.Bind<Color>(colorSettings, Locales.GetTranslatedString("radar_background_blip_color"), new Color(0f, 0.7f, 0.85f));
-            
+
             AssetBundleManager.LoadAssetBundle();
-            
+
             new GameStartPatch().Enable();
         }
     }
