@@ -8,10 +8,6 @@ using EFT.Interactive;
 using System.Linq;
 using BepInEx.Configuration;
 using EFT.InventoryLogic;
-using System.ComponentModel;
-using System;
-using System.Threading.Tasks;
-using System.Threading;
 
 namespace Radar
 {

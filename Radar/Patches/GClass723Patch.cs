@@ -1,5 +1,5 @@
 ﻿using System.Reflection;
-using Aki.Reflection.Patching;
+using SPT.Reflection.Patching;
 using EFT.Interactive;
 
 namespace Radar.Patches
@@ -8,7 +8,7 @@ namespace Radar.Patches
     {
         protected override MethodBase GetTargetMethod()
         {
-            return typeof(GClass723<int, LootItem>).GetMethod("Add", BindingFlags.Instance | BindingFlags.Public);
+            return typeof(GClass724<int, LootItem>).GetMethod("Add", BindingFlags.Instance | BindingFlags.Public);
         }
 
         [PatchPostfix]
@@ -23,7 +23,7 @@ namespace Radar.Patches
     {
         protected override MethodBase GetTargetMethod()
         {
-            return typeof(GClass723<int, LootItem>).GetMethod("Remove", BindingFlags.Instance | BindingFlags.Public);
+            return typeof(GClass724<int, LootItem>).GetMethod("Remove", BindingFlags.Instance | BindingFlags.Public);
         }
 
         [PatchPrefix]

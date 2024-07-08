@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Radar
 {
-    [BepInPlugin("Tyrian.Radar", "Radar", "1.1.5")]
+    [BepInPlugin("Tyrian.Radar", "Radar", "1.1.6")]
     public class Radar : BaseUnityPlugin
     {
         internal static Radar Instance { get; private set; }
@@ -71,7 +71,7 @@ namespace Radar
             // Add a custom configuration option for the Apply button
             radarLanguage = Config.Bind<string>(baseSettings, "Language", "EN",
                 new ConfigDescription("Preferred language, if not available will tried English",
-                new AcceptableValueList<string>("EN", "ZH", "RU")));
+                new AcceptableValueList<string>("EN", "ZH", "RU", "KO")));
 
             radarEnableConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_enable"), true);
             radarEnableShortCutConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_enable_shortcut"), new KeyboardShortcut(KeyCode.F10));

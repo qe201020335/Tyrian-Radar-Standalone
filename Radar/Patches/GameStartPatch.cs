@@ -1,10 +1,6 @@
-﻿using System.Linq;
-using System.Reflection;
-using Comfort.Common;
+﻿using System.Reflection;
 using EFT;
-using EFT.Interactive;
-using UnityEngine;
-using Aki.Reflection.Patching;
+using SPT.Reflection.Patching;
 
 namespace Radar.Patches
 {

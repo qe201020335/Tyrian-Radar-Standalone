@@ -1,5 +1,4 @@
-﻿using EFT.Interactive;
-using EFT;
+﻿using EFT;
 using UnityEngine;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
