@@ -169,6 +169,9 @@ namespace Radar
             blipPosition.y = targetPosition.y - playerPosition.y;
             blipPosition.z = targetPosition.z - playerPosition.z;
 
+            var distance = blipPosition.x * blipPosition.x + blipPosition.z * blipPosition.z;
+            _show = (distance > radarOuterRange * radarOuterRange || distance < radarInnerRange * radarInnerRange) ? false : true;
+                
             if (!_show)
             {
                 if (blipImage != null)
