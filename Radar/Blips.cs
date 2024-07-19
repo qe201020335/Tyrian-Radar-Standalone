@@ -18,27 +18,28 @@ namespace Radar
         private void UpdateBlipImage()
         {
             if (blip == null || blipImage == null) return;
+
+            float totalThreshold = playerHeight * 1.5f * Radar.radarYHeightThreshold.Value;
+
+            if (Mathf.Abs(blipPosition.y) <= totalThreshold)
+            {
+                blipImage.sprite = _isDead ? AssetBundleManager.EnemyBlipDead  : AssetBundleManager.EnemyBlip;
+            }
+            else if (blipPosition.y > totalThreshold)
+            {
+                blipImage.sprite = AssetBundleManager.EnemyBlipUp;
+            }
+            else if (blipPosition.y < -totalThreshold)
+            {
+                blipImage.sprite = AssetBundleManager.EnemyBlipDown;
+            }
+
             if (_isDead)
             {
-                blipImage.sprite = AssetBundleManager.EnemyBlipDead;
                 blipImage.color = Radar.corpseBlipColor.Value;
             }
             else
             {
-                float totalThreshold = playerHeight * 1.5f * Radar.radarYHeightThreshold.Value;
-                if (Mathf.Abs(blipPosition.y) <= totalThreshold)
-                {
-                    blipImage.sprite = AssetBundleManager.EnemyBlip;
-                }
-                else if (blipPosition.y > totalThreshold)
-                {
-                    blipImage.sprite = AssetBundleManager.EnemyBlipUp;
-                }
-                else if (blipPosition.y < -totalThreshold)
-                {
-                    blipImage.sprite = AssetBundleManager.EnemyBlipDown;
-                }
-                // set blip color
                 switch (_enemyPlayer.Profile.Info.Side)
                 {
                     case EPlayerSide.Savage:
