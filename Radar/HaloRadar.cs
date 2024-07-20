@@ -8,9 +8,17 @@ using EFT.Interactive;
 using System.Linq;
 using BepInEx.Configuration;
 using EFT.InventoryLogic;
+using System.IO;
+using Newtonsoft.Json;
+using System;
 
 namespace Radar
 {
+    [System.Serializable]
+    public class CustomLootList
+    {
+        public List<string> items { get; set; } = new List<string>();
+    }
     public class HaloRadar : MonoBehaviour
     {
         private bool debugInfo = false;
@@ -42,6 +50,8 @@ namespace Radar
         private List<BlipLoot> _lootToHide = new List<BlipLoot>();
 
         private HashSet<string> _containerSet = new HashSet<string>();
+
+        private CustomLootList? customLoots;
 
         // FPS Camera (this.transform.parent) -> RadarHUD (this.transform) -> RadarBaseTransform (transform.Find("Radar").transform) -> RadarBorderTransform
         private void Awake()
@@ -81,6 +91,26 @@ namespace Radar
             //Debug.LogError($"& HUD: {this.transform.position} {this.transform.localPosition} {this.transform.rotation} {this.transform.localRotation} {this.transform.localScale}");
             //Debug.LogError($"& RBT: {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
             //Debug.LogError($"& BOD: {RadarBorderTransform.position} {RadarBorderTransform.localPosition} {RadarBorderTransform.rotation} {RadarBorderTransform.localRotation} {RadarBorderTransform.localScale}");
+
+            string filePath = Path.Combine(Application.dataPath, "..\\BepInEx\\plugins\\radar-list.json");
+            Debug.LogError(filePath);
+
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    string jsonContent = File.ReadAllText(filePath);
+                    customLoots = JsonConvert.DeserializeObject<CustomLootList>(jsonContent);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Failed to read or parse settings file: {ex.Message}");
+                }
+            }
+            else
+            {
+                Debug.LogError("Custom loot file not found.");
+            }
 
             Radar.Log.LogInfo("Radar loaded");
         }
@@ -318,7 +348,7 @@ namespace Radar
 
         public void AddLoot(string id, Item item, Transform transform, bool lazyUpdate = false)
         {
-            if (!item.Name.StartsWith("55d7217a4bdc2d86028b456d") && CheckPrice(item))
+            if ((customLoots != null && customLoots.items.Contains(item.TemplateId)) || (!item.Name.StartsWith("55d7217a4bdc2d86028b456d") && CheckPrice(item)))
             {
                 //Debug.LogError($"Add {item.IsContainer} {item.Name} {item.LocalizedName()} {transform.position}");
                 var blip = new BlipLoot(id, transform, lazyUpdate);
