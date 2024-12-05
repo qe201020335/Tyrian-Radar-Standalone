@@ -302,7 +302,7 @@ namespace Radar
                 //if (item.Value.Transform != null)
                 //    Debug.LogError($"\t P: {item.Value.Transform.position}");
             }
-            _lootTree = new Quadtree(Rect.MinMaxRect(xMin * 1.1f, yMin * 1.1f, xMax * 1.1f, yMax * 1.1f));
+            _lootTree = new Quadtree(Rect.MinMaxRect(xMin - 5, yMin - 2, xMax + 5, yMax + 2));
             foreach (BlipLoot loot in _lootCustomObject)
                 _lootTree.Insert(loot);
         }
@@ -327,6 +327,10 @@ namespace Radar
             {
                 foreach (var subItem in item.GetAllItems())
                 {
+                    ItemExtensions.CacheFleaPrice(subItem);
+                }
+                foreach (var subItem in item.GetAllItems())
+                {
                     var price = ItemExtensions.GetBestPrice(subItem);
                     //Debug.LogError($"\tTry price: {subItem.LocalizedName()} {price}");
                     if (Radar.radarLootPerSlotConfig.Value)
@@ -338,6 +342,7 @@ namespace Radar
             }
             else
             {
+                ItemExtensions.CacheFleaPrice(item);
                 highestPrice = ItemExtensions.GetBestPrice(item);
                 if (Radar.radarLootPerSlotConfig.Value)
                     highestPrice /= item.CalculateCellSize().X * item.CalculateCellSize().Y;
