@@ -119,6 +119,7 @@ class ItemExtensions
 
         if (fleaCache.ContainsKey(item.Name))
         {
+            //UnityEngine.Debug.LogError($"Get flea price: {item.Name} {fleaCache[item.Name]}");
             return fleaCache[item.Name];
         }
         else

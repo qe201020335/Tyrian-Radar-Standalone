@@ -8,7 +8,7 @@ namespace Radar.Patches
     {
         protected override MethodBase GetTargetMethod()
         {
-            return typeof(GClass786<int, LootItem>).GetMethod("Add", BindingFlags.Instance | BindingFlags.Public);
+            return typeof(GClass797<int, LootItem>).GetMethod("Add", BindingFlags.Instance | BindingFlags.Public);
         }
 
         [PatchPostfix]
@@ -23,7 +23,7 @@ namespace Radar.Patches
     {
         protected override MethodBase GetTargetMethod()
         {
-            return typeof(GClass786<int, LootItem>).GetMethod("Remove", BindingFlags.Instance | BindingFlags.Public);
+            return typeof(GClass797<int, LootItem>).GetMethod("Remove", BindingFlags.Instance | BindingFlags.Public);
         }
 
         [PatchPrefix]
