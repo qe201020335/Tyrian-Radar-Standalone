@@ -17,25 +17,30 @@ namespace Radar
     [System.Serializable]
     public class CustomLootList
     {
-        public List<string> items { get; set; } = new List<string>();
+        public HashSet<string> items { get; set; } = new HashSet<string>();
     }
     public class HaloRadar : MonoBehaviour
     {
-        private bool debugInfo = false;
+        private const float DEFAULT_SCALE = 1f;
+        private const string PLAYER_INVENTORY_PREFIX = "55d7217a4bdc2d86028b456d";
+        private const string DRAWER_PREFIX = "578f87b7245977356274f2cd";
+        private const string FPS_CAMERA_NAME = "FPS Camera";
+        private const string COMPASS_GLASS_NAME = "compas_glass_LOD0";
 
-        private GameWorld _gameWorld = null!;
-        private Player _player = null!;
+        private readonly bool debugInfo = false;
 
-        public static RectTransform RadarBorderTransform { get; private set; } = null!;
-        public static RectTransform RadarBaseTransform { get; private set; } = null!;
-        public static GameObject RadarBase { get; private set; } = null!;
+        private GameWorld _gameWorld;
+        private Player _player;
 
-        private RectTransform RadarPulseTransform = null!;
-        
-        private Coroutine? _pulseCoroutine;
+        public static RectTransform RadarBorderTransform { get; private set; }
+        public static RectTransform RadarBaseTransform { get; private set; }
+        public static GameObject RadarBase { get; private set; }
+
+        private RectTransform _radarPulseTransform;
+
+        private Coroutine _pulseCoroutine;
         private float _radarPulseInterval = 1f;
-        private float _defaultScale = 1f;
-        
+
         private Vector3 _radarScaleStart;
 
         public static float RadarLastUpdateTime = 0;
@@ -43,15 +48,24 @@ namespace Radar
         private readonly Dictionary<string, BlipPlayer> _enemyList = new Dictionary<string, BlipPlayer>();
 
         private readonly List<BlipLoot> _lootCustomObject = new List<BlipLoot>();
-        private HashSet<string> _lootInList = new HashSet<string>();
-        private Dictionary<string, Transform> _containerTransforms = new Dictionary<string, Transform>();
-        private Quadtree? _lootTree = null;
-        private List<BlipLoot>? _activeLootOnRadar = null;
-        private List<BlipLoot> _lootToHide = new List<BlipLoot>();
+        private readonly HashSet<string> _lootInList = new HashSet<string>();
+        private readonly Dictionary<string, Transform> _containerTransforms = new Dictionary<string, Transform>();
+        private Quadtree _lootTree;
+        private List<BlipLoot> _activeLootOnRadar;
+        private readonly List<BlipLoot> _lootToHide = new List<BlipLoot>();
 
-        private HashSet<string> _containerSet = new HashSet<string>();
+        private readonly HashSet<string> _containerSet = new HashSet<string>();
 
-        private CustomLootList? customLoots;
+        private CustomLootList _customLoots;
+
+        private bool _compassOn = false;
+        private GameObject _compassGlass;
+        private Canvas _radarCanvas;
+        private Image _radarBorderImage;
+        private Image _radarPulseImage;
+        private Image _radarBackgroundImage;
+        private Transform _radarBackgroundTransform;
+        private GameObject _fpsCameraObject;
 
         // FPS Camera (this.transform.parent) -> RadarHUD (this.transform) -> RadarBaseTransform (transform.Find("Radar").transform) -> RadarBorderTransform
         private void Awake()
@@ -65,7 +79,7 @@ namespace Radar
                 Destroy(gameObject);
                 return;
             }
-            
+
             _gameWorld = Singleton<GameWorld>.Instance;
             if (_gameWorld.MainPlayer == null)
             {
@@ -73,34 +87,49 @@ namespace Radar
                 Destroy(gameObject);
                 return;
             }
-            
+
             _player = _gameWorld.MainPlayer;
+            _fpsCameraObject = GameObject.Find(FPS_CAMERA_NAME);
 
             RadarBaseTransform = (transform.Find("Radar") as RectTransform)!;
             RadarBase = RadarBaseTransform.gameObject;
             _radarScaleStart = RadarBaseTransform.localScale;
 
-            RadarBorderTransform = (transform.Find("Radar/RadarBorder") as RectTransform)!;
+            RadarBorderTransform = transform.Find("Radar/RadarBorder") as RectTransform;
             RadarBorderTransform.SetAsLastSibling();
-            RadarBorderTransform.GetComponent<Image>().color = Radar.backgroundColor.Value;
-            
-            RadarPulseTransform = (transform.Find("Radar/RadarPulse") as RectTransform)!;
-            RadarPulseTransform.GetComponent<Image>().color = Radar.backgroundColor.Value;
-            transform.Find("Radar/RadarBackground").GetComponent<Image>().color = Radar.backgroundColor.Value;
+            _radarBorderImage = RadarBorderTransform.GetComponent<Image>();
+            _radarBorderImage.color = Radar.backgroundColor.Value;
+
+            _radarPulseTransform = transform.Find("Radar/RadarPulse") as RectTransform;
+            _radarPulseImage = _radarPulseTransform.GetComponent<Image>();
+            _radarPulseImage.color = Radar.backgroundColor.Value;
+
+            _radarBackgroundTransform = transform.Find("Radar/RadarBackground");
+            _radarBackgroundImage = _radarBackgroundTransform.GetComponent<Image>();
+            _radarBackgroundImage.color = Radar.backgroundColor.Value;
+
+            _radarCanvas = GetComponentInChildren<Canvas>();
 
             //Debug.LogError($"& HUD: {this.transform.position} {this.transform.localPosition} {this.transform.rotation} {this.transform.localRotation} {this.transform.localScale}");
             //Debug.LogError($"& RBT: {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
             //Debug.LogError($"& BOD: {RadarBorderTransform.position} {RadarBorderTransform.localPosition} {RadarBorderTransform.rotation} {RadarBorderTransform.localRotation} {RadarBorderTransform.localScale}");
+            
+            // Load custom loot list
+            LoadCustomLootList();
+            ItemExtensions.Init();
 
+            Radar.Log.LogInfo("Radar loaded");
+        }
+
+        private void LoadCustomLootList()
+        {
             string filePath = Path.Combine(Application.dataPath, "..\\BepInEx\\plugins\\radar-list.json");
-            Debug.LogError(filePath);
-
             if (File.Exists(filePath))
             {
                 try
                 {
                     string jsonContent = File.ReadAllText(filePath);
-                    customLoots = JsonConvert.DeserializeObject<CustomLootList>(jsonContent);
+                    _customLoots = JsonConvert.DeserializeObject<CustomLootList>(jsonContent)!;
                 }
                 catch (Exception ex)
                 {
@@ -111,9 +140,8 @@ namespace Radar
             {
                 Debug.LogError("Custom loot file not found.");
             }
-
-            Radar.Log.LogInfo("Radar loaded");
         }
+
         private void InitRadar()
         {
             if (Radar.radarEnableCompassConfig.Value)
@@ -125,53 +153,43 @@ namespace Radar
                 UpdateLootList();
         }
 
-        private bool compassOn = false;
-        private GameObject? compassGlass;
-
         private void InitNormalRadar()
         {
             if (debugInfo)
                 Debug.LogError("# InitNormalRadar");
-            compassGlass = null;
-            Canvas radarCanvas = GetComponentInChildren<Canvas>();
-            RadarBase.SetActive(true);
-            if (radarCanvas != null)
+
+            _compassGlass = null;
+            if (_radarCanvas != null)
             {
-                radarCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                radarCanvas.worldCamera = null;
+                _radarCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                _radarCanvas.worldCamera = null;
             }
-            transform.SetParent(GameObject.Find("FPS Camera").transform);
-            
-            // setting this will cause radar location to be changed when game start
-            //transform.localScale = Vector3.one * 1.3333333f; // 1.333f is the default localScale for transform
+
+            transform.SetParent(_fpsCameraObject.transform);
+
             transform.rotation = Quaternion.identity;
             RadarBaseTransform.position = new Vector2(Radar.radarOffsetXConfig.Value, Radar.radarOffsetYConfig.Value);
             RadarBaseTransform.rotation = Quaternion.identity;
             RadarBaseTransform.localScale = _radarScaleStart * Radar.radarSizeConfig.Value;
             RadarBorderTransform.rotation = Quaternion.identity;
-
-            //Debug.LogError($"^ {transform.position} {transform.localPosition} {transform.rotation} {transform.localRotation} {transform.localScale}");
-            //Debug.LogError($"^ {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
+            RadarBase.SetActive(true);
         }
 
         public void SetCompassParent(bool enable)
         {
-            if (enable && compassGlass != null)
-                transform.parent = compassGlass.transform;
-            else
-                transform.parent = GameObject.Find("FPS Camera").transform;
+            transform.SetParent(enable && _compassGlass != null ? _compassGlass.transform : _fpsCameraObject.transform);
         }
 
         private void InitCompassRadar()
         {
             if (debugInfo)
                 Debug.LogError("# InitCompassRadar");
+
             // Ensure the Canvas is set to World Space
-            Canvas radarCanvas = GetComponentInChildren<Canvas>();
-            if (radarCanvas != null)
+            if (_radarCanvas != null)
             {
-                radarCanvas.renderMode = RenderMode.WorldSpace;
-                radarCanvas.worldCamera = Camera.main;
+                _radarCanvas.renderMode = RenderMode.WorldSpace;
+                _radarCanvas.worldCamera = Camera.main;
             }
 
             // Set the parent of RadarHUD
@@ -183,11 +201,12 @@ namespace Radar
             RadarBaseTransform.localScale = Vector3.one * 0.000123f;
             RadarBorderTransform.localRotation = Quaternion.identity;
         }
-        
+
         private void OnEnable()
         {
             if (debugInfo)
                 Debug.LogError("# OnEnable");
+
             InitRadar();
             Radar.Instance.Config.SettingChanged += UpdateRadarSettings;
             UpdateRadarSettings();
@@ -197,7 +216,14 @@ namespace Radar
         {
             if (debugInfo)
                 Debug.LogError("# OnDisable");
+
             Radar.Instance.Config.SettingChanged -= UpdateRadarSettings;
+
+            if (_pulseCoroutine != null)
+            {
+                StopCoroutine(_pulseCoroutine);
+                _pulseCoroutine = null;
+            }
         }
 
         private void ClearLoot()
@@ -217,7 +243,7 @@ namespace Radar
             }
         }
 
-        private void UpdateRadarSettings(object? sender = null, SettingChangedEventArgs? e = null)
+        private void UpdateRadarSettings(object sender = null, SettingChangedEventArgs e = null)
         {
             if (!gameObject.activeInHierarchy) return; // Don't update if the radar object is disabled
 
@@ -228,9 +254,10 @@ namespace Radar
 
             if (e != null && e.ChangedSetting == Radar.backgroundColor)
             {
-                RadarBorderTransform.GetComponent<Image>().color = Radar.backgroundColor.Value;
-                RadarPulseTransform.GetComponent<Image>().color = Radar.backgroundColor.Value;
-                transform.Find("Radar/RadarBackground").GetComponent<Image>().color = Radar.backgroundColor.Value;
+                Color newColor = Radar.backgroundColor.Value;
+                _radarBorderImage.color = newColor;
+                _radarPulseImage.color = newColor;
+                _radarBackgroundImage.color = newColor;
             }
 
             if (e != null && e.ChangedSetting == Radar.radarEnableCompassConfig)
@@ -260,48 +287,39 @@ namespace Radar
         {
             ClearLoot();
 
-            float xMin = 99999, xMax = -99999, yMin = 99999, yMax = -99999;
+            float xMin = float.MaxValue, xMax = float.MinValue, yMin = float.MaxValue, yMax = float.MinValue;
             var allItemOwner = _gameWorld.ItemOwners;
 
-            // some containers will have duplicates (except drawer which should and do have 4 duplicates), here we need to filter them out
-            // iterate the dict reversely because later container will substitute the previous one at the same position
-            HashSet<Vector3> _duplicatePosition = new HashSet<Vector3>();
+            // Process containers and filter out duplicates
+            HashSet<Vector3> duplicatePositions = new HashSet<Vector3>();
             foreach (var item in allItemOwner.Reverse())
             {
-                // 55d7217a4bdc2d86028b456d is the player inventory
-                if (!item.Key.RootItem.Name.StartsWith("55d7217a4bdc2d86028b456d") && item.Value.Transform != null)
+                if (item.Key.RootItem.Name.StartsWith(PLAYER_INVENTORY_PREFIX) || item.Value.Transform == null)
+                    continue;
+
+                // Handle duplicates
+                if (!item.Key.ContainerName.StartsWith(DRAWER_PREFIX) && !duplicatePositions.Add(item.Value.Transform.position))
+                    continue;
+
+                AddLoot(item.Key.ID, item.Key.Items.First(), item.Value.Transform);
+
+                // Set up event handlers for containers
+                if (item.Key.Items.First().IsContainer && _containerSet.Add(item.Key.ID))
                 {
-                    // 578f87b7245977356274f2cd is drawer, which has exact 4 duplicates for each position
-                    if (!item.Key.ContainerName.StartsWith("578f87b7245977356274f2cd") && _duplicatePosition.Contains(item.Value.Transform.position))
-                        continue;
-                    else
-                        _duplicatePosition.Add(item.Value.Transform.position);
-
-                    AddLoot(item.Key.ID, item.Key.Items.First(), item.Value.Transform);
-                    if (item.Key.Items.First().IsContainer && !_containerSet.Contains(item.Key.ID))
-                    {
-                        //Debug.LogError($"Add event for: {item.Key.ID} {item.Key.ContainerName}");
-                        item.Key.RemoveItemEvent += (args) => OnContainerRemoveItemEvent(item.Key, args);
-                        item.Key.AddItemEvent += (args) => OnContainerAddItemEvent(item.Key, args);
-                        _containerSet.Add(item.Key.ID);
-                        _containerTransforms.Add(item.Key.ID, item.Value.Transform);
-                    }
-
-                    var loc = item.Value.Transform.position;
-                    if (loc.x < xMin)
-                        xMin = loc.x;
-                    if (loc.x > xMax)
-                        xMax = loc.x;
-                    if (loc.z < yMin)
-                        yMin = loc.z;
-                    if (loc.z > yMax)
-                        yMax = loc.z;
+                    item.Key.RemoveItemEvent += (args) => OnContainerRemoveItemEvent(item.Key, args);
+                    item.Key.AddItemEvent += (args) => OnContainerAddItemEvent(item.Key, args);
+                    _containerTransforms[item.Key.ID] = item.Value.Transform;
                 }
 
-                //Debug.LogError($"C ID: {item.Key.ID} {item.Key.ContainerName} {item.Key.RootItem.Name}");
-                //if (item.Value.Transform != null)
-                //    Debug.LogError($"\t P: {item.Value.Transform.position}");
+                // Track bounds for quadtree
+                Vector3 pos = item.Value.Transform.position;
+                xMin = Mathf.Min(xMin, pos.x);
+                xMax = Mathf.Max(xMax, pos.x);
+                yMin = Mathf.Min(yMin, pos.z);
+                yMax = Mathf.Max(yMax, pos.z);
             }
+
+            // Create quadtree with padding
             _lootTree = new Quadtree(Rect.MinMaxRect(xMin - 5, yMin - 2, xMax + 5, yMax + 2));
             foreach (BlipLoot loot in _lootCustomObject)
                 _lootTree.Insert(loot);
@@ -309,7 +327,7 @@ namespace Radar
 
         private void OnContainerAddItemEvent(IItemOwner itemOwner, GEventArgs2 args)
         {
-            // New item has high price &&  has not been added
+            // New item has high price && has not been added
             if (CheckPrice(args.Item) && !_lootInList.Contains(itemOwner.ID))
                 AddLoot(itemOwner.ID, itemOwner.Items.First(), _containerTransforms[itemOwner.ID]);
         }
@@ -322,22 +340,32 @@ namespace Radar
 
         private bool CheckPrice(Item item)
         {
-            var highestPrice = 0;
+            int highestPrice = 0;
+
             if (item.IsContainer)
             {
-                foreach (var subItem in item.GetAllItems())
+                var allItems = item.GetAllItems();
+
+                // Cache all prices first
+                foreach (var subItem in allItems)
                 {
                     ItemExtensions.CacheFleaPrice(subItem);
                 }
-                foreach (var subItem in item.GetAllItems())
-                {
-                    var price = ItemExtensions.GetBestPrice(subItem);
-                    //Debug.LogError($"\tTry price: {subItem.LocalizedName()} {price}");
-                    if (Radar.radarLootPerSlotConfig.Value)
-                        price /= subItem.CalculateCellSize().X * subItem.CalculateCellSize().Y;
 
-                    if (price > highestPrice)
-                        highestPrice = price;
+                // Then calculate highest price
+                foreach (var subItem in allItems)
+                {
+                    int price = ItemExtensions.GetBestPrice(subItem);
+
+                    if (Radar.radarLootPerSlotConfig.Value)
+                    {
+                        var cellSize = subItem.CalculateCellSize();
+                        int slotCount = cellSize.X * cellSize.Y;
+                        if (slotCount > 0) // Avoid division by zero
+                            price /= slotCount;
+                    }
+
+                    highestPrice = Mathf.Max(highestPrice, price);
                 }
             }
             else
@@ -345,7 +373,12 @@ namespace Radar
                 ItemExtensions.CacheFleaPrice(item);
                 highestPrice = ItemExtensions.GetBestPrice(item);
                 if (Radar.radarLootPerSlotConfig.Value)
-                    highestPrice /= item.CalculateCellSize().X * item.CalculateCellSize().Y;
+                {
+                    var cellSize = item.CalculateCellSize();
+                    int slotCount = cellSize.X * cellSize.Y;
+                    if (slotCount > 0) // Avoid division by zero
+                        highestPrice /= slotCount;
+                }
             }
 
             return highestPrice > Radar.radarLootThreshold.Value;
@@ -353,7 +386,10 @@ namespace Radar
 
         public void AddLoot(string id, Item item, Transform transform, bool lazyUpdate = false)
         {
-            if ((customLoots != null && customLoots.items.Contains(item.TemplateId)) || (!item.Name.StartsWith("55d7217a4bdc2d86028b456d") && CheckPrice(item)))
+            bool isCustomItem = _customLoots?.items.Contains(item.TemplateId) ?? false;
+            bool isValuableItem = !item.Name.StartsWith(PLAYER_INVENTORY_PREFIX) && CheckPrice(item);
+
+            if (isCustomItem || isValuableItem)
             {
                 //Debug.LogError($"Add {item.IsContainer} {item.Name} {item.LocalizedName()} {transform.position}");
                 var blip = new BlipLoot(id, transform, lazyUpdate);
@@ -410,7 +446,7 @@ namespace Radar
                 _pulseCoroutine = null;
             }
 
-            RadarPulseTransform.gameObject.SetActive(enable);
+            _radarPulseTransform.gameObject.SetActive(enable);
         }
 
         private void Update()
@@ -427,25 +463,25 @@ namespace Radar
             {
                 Player.ItemHandsController? handsController = _player.HandsController as Player.ItemHandsController;
                 var compassInHand = handsController != null && handsController.CurrentCompassState;
-                if (compassInHand && !compassOn)
+                if (compassInHand && !_compassOn)
                 {
-                    compassOn = true;
+                    _compassOn = true;
                     RadarBase.SetActive(true);
                     SetCompassParent(true);
                 }
-                if (!compassInHand && compassOn)
+                if (!compassInHand && _compassOn)
                 {
-                    compassOn = false;
+                    _compassOn = false;
                     RadarBase.SetActive(false);
                     SetCompassParent(false);
                 }
 
-                if (compassOn && compassGlass == null)
+                if (_compassOn && _compassGlass == null)
                 {
-                    compassGlass = GameObject.Find("compas_glass_LOD0");
-                    if (compassGlass != null && transform.parent != compassGlass.transform)
+                    _compassGlass = GameObject.Find(COMPASS_GLASS_NAME);
+                    if (_compassGlass != null && transform.parent != _compassGlass.transform)
                     {
-                        transform.parent = compassGlass.transform;
+                        transform.parent = _compassGlass.transform;
                         transform.localPosition = Vector3.zero;
                         transform.localRotation = Quaternion.identity;
                     }
@@ -465,7 +501,7 @@ namespace Radar
                     float angle = Mathf.Lerp(0f, 1f, 1 - t) * 360;
 
                     // Apply the scale to all axes
-                    RadarPulseTransform.localEulerAngles = new Vector3(0, 0, angle);
+                    _radarPulseTransform.localEulerAngles = new Vector3(0, 0, angle);
                     yield return null;
                 }
                 // Pause for the specified duration

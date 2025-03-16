@@ -11,26 +11,18 @@ using System;
 using UnityEngine;
 using System.Diagnostics;
 using System.Threading;
+using static System.Collections.Specialized.BitVector32;
 
 internal static class TraderClassExtensions
 {
-    private static ISession _Session;
-    private static ISession Session => _Session ??= ClientAppUtils.GetMainApp().GetClientBackEndSession();
-
-    private static readonly FieldInfo SupplyDataField =
-        typeof(TraderClass).GetField("supplyData_0", BindingFlags.NonPublic | BindingFlags.Instance);
-
-    public static SupplyData GetSupplyData(this TraderClass trader) =>
-        SupplyDataField.GetValue(trader) as SupplyData;
-
-    public static void SetSupplyData(this TraderClass trader, SupplyData supplyData) =>
-        SupplyDataField.SetValue(trader, supplyData);
-
+    private static ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
     public static async void UpdateSupplyData(this TraderClass trader)
     {
         Result<SupplyData> result = await Session.GetSupplyData(trader.Id);
         if (result.Succeed)
-            trader.SetSupplyData(result.Value);
+        {
+            trader.supplyData_0 = result.Value;
+        }
         else
             UnityEngine.Debug.LogError("Failed to download supply data");
     }
@@ -58,18 +50,27 @@ class ItemExtensions
         }
     }
 
+    public static void Init()
+    {
+        foreach (var trader in Session.Traders)
+        {
+            TraderClassExtensions.UpdateSupplyData(trader);
+        }
+    }
+
     public static TraderOffer? GetTraderOffer(Item item, TraderClass trader)
     {
-        try {
+        if (trader.supplyData_0 != null)
+        {
             var result = trader.GetUserItemPrice(item);
             return result is null ? null : new(
                 trader.LocalizedName,
                 result.Value.Amount,
-                trader.GetSupplyData().CurrencyCourses[result.Value.CurrencyId],
+                trader.Dictionary_0[result.Value.CurrencyId],
                 item.StackObjectsCount
             );
         }
-        catch
+        else
         {
             return null;
         }
@@ -77,8 +78,8 @@ class ItemExtensions
 
     public static IEnumerable<TraderOffer?>? GetAllTraderOffers(Item item)
     {
-        if (!Session.Profile.Examined(item))
-            return null;
+        //if (!Session.Profile.Examined(item))
+        //    return null;
         switch (item.Owner?.OwnerType)
         {
             case EOwnerType.RagFair:
@@ -100,13 +101,28 @@ class ItemExtensions
     public static void CacheFleaPrice(Item item)
     {
         var ragFairClass = Session.RagFair;
-        if (!ragFairClass.Available || fleaCache.ContainsKey(item.Name))
+        if (fleaCache.ContainsKey(item.Name) || !ragFairClass.Available)
         {
             return;
         }
-        ragFairClass.GetMarketPrices(item.TemplateId, result => {
-            fleaCache[item.Name] = (int) result.avg;
-        });
+
+        try
+        {
+            ragFairClass.GetMarketPrices(item.TemplateId, result =>
+            {
+                if (result == null)
+                {
+                    UnityEngine.Debug.LogError($"Error: Received null result for item {item.Name}");
+                    return;
+                }
+
+                fleaCache[item.Name] = (int)result.avg;
+            });
+        }
+        catch (Exception ex)
+        {
+            UnityEngine.Debug.LogError($"Unexpected error in CacheFleaPrice for {item.Name}: {ex.Message}");
+        }
     }
 
     public static int GetFleaPrice(Item item)
@@ -119,7 +135,6 @@ class ItemExtensions
 
         if (fleaCache.ContainsKey(item.Name))
         {
-            //UnityEngine.Debug.LogError($"Get flea price: {item.Name} {fleaCache[item.Name]}");
             return fleaCache[item.Name];
         }
         else
@@ -134,7 +149,6 @@ class ItemExtensions
         {
             return traderCache[item.Name];
         }
-
         var offer = GetAllTraderOffers(item)?.FirstOrDefault() ?? null;
         var price = 0;
         if (offer != null)
@@ -145,9 +159,8 @@ class ItemExtensions
         return price;
     }
         
-
     public static int GetBestPrice(Item item)
-    {                                                                                 
+    {
         var fleaPrice = GetFleaPrice(item);
         var traderPrice = GetBestTraderPrice(item);
         return fleaPrice > traderPrice ? fleaPrice : traderPrice;
