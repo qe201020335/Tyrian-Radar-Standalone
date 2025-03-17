@@ -16,6 +16,7 @@ using static System.Collections.Specialized.BitVector32;
 internal static class TraderClassExtensions
 {
     private static ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
+    public static bool IsInit = false;
     public static async void UpdateSupplyData(this TraderClass trader)
     {
         Result<SupplyData> result = await Session.GetSupplyData(trader.Id);
@@ -31,6 +32,7 @@ internal static class TraderClassExtensions
 class ItemExtensions
 {
     public static ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
+    static HashSet<String> fleaPending = new HashSet<String>();
     static Dictionary<string, int> fleaCache = new Dictionary<string, int>();
     static Dictionary<string, int> traderCache = new Dictionary<string, int>();
 
@@ -52,10 +54,16 @@ class ItemExtensions
 
     public static void Init()
     {
+        if (TraderClassExtensions.IsInit)
+        {
+            return;
+        }
+
         foreach (var trader in Session.Traders)
         {
             TraderClassExtensions.UpdateSupplyData(trader);
         }
+        TraderClassExtensions.IsInit = true;
     }
 
     public static TraderOffer? GetTraderOffer(Item item, TraderClass trader)
@@ -101,13 +109,14 @@ class ItemExtensions
     public static void CacheFleaPrice(Item item)
     {
         var ragFairClass = Session.RagFair;
-        if (fleaCache.ContainsKey(item.Name) || !ragFairClass.Available)
+        if (fleaPending.Contains(item.Name) || fleaCache.ContainsKey(item.Name) || !ragFairClass.Available)
         {
             return;
         }
 
         try
         {
+            fleaPending.Add(item.Name);
             ragFairClass.GetMarketPrices(item.TemplateId, result =>
             {
                 if (result == null)
@@ -116,6 +125,7 @@ class ItemExtensions
                     return;
                 }
 
+                UnityEngine.Debug.LogError($"Get flea price for item {item.Name}");
                 fleaCache[item.Name] = (int)result.avg;
             });
         }
@@ -161,6 +171,7 @@ class ItemExtensions
         
     public static int GetBestPrice(Item item)
     {
+        UnityEngine.Debug.LogError($"> Try best price: {item.Name}");
         var fleaPrice = GetFleaPrice(item);
         var traderPrice = GetBestTraderPrice(item);
         return fleaPrice > traderPrice ? fleaPrice : traderPrice;

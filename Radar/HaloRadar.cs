@@ -31,6 +31,7 @@ namespace Radar
 
         private GameWorld _gameWorld;
         private Player _player;
+        public bool inGame = false;
 
         public static RectTransform RadarBorderTransform { get; private set; }
         public static RectTransform RadarBaseTransform { get; private set; }
@@ -210,6 +211,7 @@ namespace Radar
             InitRadar();
             Radar.Instance.Config.SettingChanged += UpdateRadarSettings;
             UpdateRadarSettings();
+            inGame = true;
         }
 
         private void OnDisable()
@@ -224,6 +226,8 @@ namespace Radar
                 StopCoroutine(_pulseCoroutine);
                 _pulseCoroutine = null;
             }
+
+            inGame = false;
         }
 
         private void ClearLoot()
@@ -240,6 +244,11 @@ namespace Radar
                     loot.DestoryBlip();
 
                 _lootCustomObject.Clear();
+            }
+
+            if (_lootInList != null)
+            {
+                _lootInList.Clear();
             }
         }
 
@@ -278,15 +287,12 @@ namespace Radar
             {
                 if (Radar.radarEnableLootConfig.Value)
                     UpdateLootList();
-                else
-                    ClearLoot();
             }
         }
 
         private void UpdateLootList()
         {
             ClearLoot();
-
             float xMin = float.MaxValue, xMax = float.MinValue, yMin = float.MaxValue, yMax = float.MinValue;
             var allItemOwner = _gameWorld.ItemOwners;
 
@@ -391,7 +397,7 @@ namespace Radar
 
             if (isCustomItem || isValuableItem)
             {
-                //Debug.LogError($"Add {item.IsContainer} {item.Name} {item.LocalizedName()} {transform.position}");
+                //Debug.LogError($"AddLoot {item.IsContainer} {item.Name} {item.LocalizedName()} {transform.position}");
                 var blip = new BlipLoot(id, transform, lazyUpdate);
                 _lootCustomObject.Add(blip);
                 _lootTree?.Insert(blip);

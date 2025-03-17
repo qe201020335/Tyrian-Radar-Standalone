@@ -14,9 +14,18 @@ namespace Radar.Patches
         [PatchPostfix]
         static void PostFix(int key, LootItem value)
         {
-            //UnityEngine.Debug.LogError($"Added called with key {key} and item id {value.ItemId} {value.Item.LocalizedName()}");
-            var radar = InRaidRadarManager._radarGo?.GetComponent<HaloRadar>();
-            radar?.AddLoot(value.ItemId, value.Item, value.TrackableTransform, true);
+            //UnityEngine.Debug.LogError($"Patched Add called with key {key} and item id {value.ItemId} {value.Item.LocalizedName()}");
+
+            var radarGo = InRaidRadarManager._radarGo;
+            if ( radarGo == null ) {
+                return;
+            }
+
+            var radar = radarGo.GetComponent<HaloRadar>();
+            if (radar != null && radar.inGame)
+            {
+                radar?.AddLoot(value.ItemId, value.Item, value.TrackableTransform, true);
+            }
         }
     }
     internal class GClass723PatchRemove : ModulePatch
