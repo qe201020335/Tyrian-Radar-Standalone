@@ -17,14 +17,14 @@ namespace Radar.Patches
             //UnityEngine.Debug.LogError($"Patched Add called with key {key} and item id {value.ItemId} {value.Item.LocalizedName()}");
 
             var radarGo = InRaidRadarManager._radarGo;
-            if ( radarGo == null ) {
+            if (radarGo == null) {
                 return;
             }
 
             var radar = radarGo.GetComponent<HaloRadar>();
             if (radar != null && radar.inGame)
             {
-                radar?.AddLoot(value.ItemId, value.Item, value.TrackableTransform, true);
+                radar.AddLoot(value.ItemId, value.Item, value.TrackableTransform, true);
             }
         }
     }
@@ -38,9 +38,18 @@ namespace Radar.Patches
         [PatchPrefix]
         static void PreFix(int key)
         {
-            //UnityEngine.Debug.LogError($"Remove Called with key {key}");
-            var radar = InRaidRadarManager._radarGo?.GetComponent<HaloRadar>();
-            radar?.RemoveLootByKey(key);
+            //UnityEngine.Debug.LogError($"Patched Remove {key}");
+            var radarGo = InRaidRadarManager._radarGo;
+            if (radarGo == null)
+            {
+                return;
+            }
+
+            var radar = radarGo.GetComponent<HaloRadar>();
+            if (radar != null && radar.inGame)
+            {
+                radar.RemoveLootByKey(key);
+            }
         }
     }
 }

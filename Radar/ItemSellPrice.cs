@@ -12,28 +12,38 @@ using UnityEngine;
 using System.Diagnostics;
 using System.Threading;
 using static System.Collections.Specialized.BitVector32;
+using System.Threading.Tasks;
+using System.Collections;
 
 internal static class TraderClassExtensions
 {
     private static ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
     public static bool IsInit = false;
-    public static async void UpdateSupplyData(this TraderClass trader)
+    public static async Task UpdateSupplyData(this TraderClass trader)
     {
-        Result<SupplyData> result = await Session.GetSupplyData(trader.Id);
-        if (result.Succeed)
+        try
         {
-            trader.supplyData_0 = result.Value;
+            Result<SupplyData> result = await Session.GetSupplyData(trader.Id);
+            if (result.Succeed)
+            {
+                trader.supplyData_0 = result.Value;
+            }
+            else
+            {
+                UnityEngine.Debug.LogError($"Failed to download supply data for trader {trader.Id}");
+            }
         }
-        else
-            UnityEngine.Debug.LogError("Failed to download supply data");
+        catch (Exception ex)
+        {
+            UnityEngine.Debug.LogError($"Error updating supply data for trader {trader.Id}: {ex}");
+        }
     }
 }
 
-class ItemExtensions
+class ItemExtensions : MonoBehaviour
 {
     public static ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
-    static HashSet<String> fleaPending = new HashSet<String>();
-    static Dictionary<string, int> fleaCache = new Dictionary<string, int>();
+    static Dictionary<string, float>? fleaCache = null;
     static Dictionary<string, int> traderCache = new Dictionary<string, int>();
 
     public sealed class TraderOffer
@@ -52,17 +62,52 @@ class ItemExtensions
         }
     }
 
-    public static void Init()
+    public static void Init(MonoBehaviour coroutineRunner)
     {
         if (TraderClassExtensions.IsInit)
         {
             return;
         }
 
+        coroutineRunner.StartCoroutine(InitCoroutine());
+    }
+
+    private static IEnumerator InitCoroutine()
+    {
+        // Start trader updates
+        var traderTasks = new List<Task>();
         foreach (var trader in Session.Traders)
         {
-            TraderClassExtensions.UpdateSupplyData(trader);
+            traderTasks.Add(TraderClassExtensions.UpdateSupplyData(trader));
         }
+
+        // Start flea prices request
+        var fleaPricesCompleted = false;
+        Session.RagfairGetPrices(result =>
+        {
+            if (result.Succeed && result.Value != null)
+            {
+                fleaCache = result.Value;
+            }
+            else
+            {
+                UnityEngine.Debug.LogError("[RADAR] Failed to get Ragfair database");
+            }
+            fleaPricesCompleted = true;
+        });
+
+        // Wait for all traders to complete
+        while (traderTasks.Any(t => !t.IsCompleted))
+        {
+            yield return null;
+        }
+
+        // Wait for flea prices to complete
+        while (!fleaPricesCompleted)
+        {
+            yield return null;
+        }
+
         TraderClassExtensions.IsInit = true;
     }
 
@@ -106,46 +151,11 @@ class ItemExtensions
             .OrderByDescending(offer => offer?.Price * offer?.Course);
     }
 
-    public static void CacheFleaPrice(Item item)
-    {
-        var ragFairClass = Session.RagFair;
-        if (fleaPending.Contains(item.Name) || fleaCache.ContainsKey(item.Name) || !ragFairClass.Available)
-        {
-            return;
-        }
-
-        try
-        {
-            fleaPending.Add(item.Name);
-            ragFairClass.GetMarketPrices(item.TemplateId, result =>
-            {
-                if (result == null)
-                {
-                    UnityEngine.Debug.LogError($"Error: Received null result for item {item.Name}");
-                    return;
-                }
-
-                UnityEngine.Debug.LogError($"Get flea price for item {item.Name}");
-                fleaCache[item.Name] = (int)result.avg;
-            });
-        }
-        catch (Exception ex)
-        {
-            UnityEngine.Debug.LogError($"Unexpected error in CacheFleaPrice for {item.Name}: {ex.Message}");
-        }
-    }
-
     public static int GetFleaPrice(Item item)
     {
-        var ragFairClass = Session.RagFair;
-        if (!ragFairClass.Available)
+        if (fleaCache != null && fleaCache.ContainsKey(item.TemplateId))
         {
-            return 0;
-        }
-
-        if (fleaCache.ContainsKey(item.Name))
-        {
-            return fleaCache[item.Name];
+            return (int) fleaCache[item.TemplateId];
         }
         else
         {
@@ -164,14 +174,14 @@ class ItemExtensions
         if (offer != null)
         {
             price = offer.Price;
+            traderCache[item.Name] = price;
         }
-        traderCache[item.Name] = price;
+        
         return price;
     }
-        
+
     public static int GetBestPrice(Item item)
     {
-        UnityEngine.Debug.LogError($"> Try best price: {item.Name}");
         var fleaPrice = GetFleaPrice(item);
         var traderPrice = GetBestTraderPrice(item);
         return fleaPrice > traderPrice ? fleaPrice : traderPrice;

@@ -16,11 +16,17 @@ namespace Radar.Patches
         [PatchPostfix]
         static void PostFix(Player __instance, [NotNull] GInterface322 weapon, Vector3 force)
         {
-            if (InRaidRadarManager._radarGo != null)
+            //UnityEngine.Debug.LogError($"Patched Player {__instance == null}");
+            var radarGo = InRaidRadarManager._radarGo;
+            if (radarGo == null)
             {
-                var radar = InRaidRadarManager._radarGo?.GetComponent<HaloRadar>();
-                if (__instance != null)
-                    radar?.UpdateFireTime(__instance.ProfileId);
+                return;
+            }
+
+            var radar = radarGo.GetComponent<HaloRadar>();
+            if (radar != null && radar.inGame && __instance != null)
+            {
+                radar.UpdateFireTime(__instance.ProfileId);
             }
         }
     }

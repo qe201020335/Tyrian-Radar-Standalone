@@ -11,6 +11,7 @@ using EFT.InventoryLogic;
 using System.IO;
 using Newtonsoft.Json;
 using System;
+using SPT.Reflection.Utils;
 
 namespace Radar
 {
@@ -117,7 +118,7 @@ namespace Radar
             
             // Load custom loot list
             LoadCustomLootList();
-            ItemExtensions.Init();
+            ItemExtensions.Init(this);
 
             Radar.Log.LogInfo("Radar loaded");
         }
@@ -352,12 +353,6 @@ namespace Radar
             {
                 var allItems = item.GetAllItems();
 
-                // Cache all prices first
-                foreach (var subItem in allItems)
-                {
-                    ItemExtensions.CacheFleaPrice(subItem);
-                }
-
                 // Then calculate highest price
                 foreach (var subItem in allItems)
                 {
@@ -376,7 +371,6 @@ namespace Radar
             }
             else
             {
-                ItemExtensions.CacheFleaPrice(item);
                 highestPrice = ItemExtensions.GetBestPrice(item);
                 if (Radar.radarLootPerSlotConfig.Value)
                 {
@@ -392,12 +386,13 @@ namespace Radar
 
         public void AddLoot(string id, Item item, Transform transform, bool lazyUpdate = false)
         {
+            //Debug.LogError($"AddLoot {item.IsContainer} {item.Name} {item.LocalizedName()} {transform.position}");
             bool isCustomItem = _customLoots?.items.Contains(item.TemplateId) ?? false;
             bool isValuableItem = !item.Name.StartsWith(PLAYER_INVENTORY_PREFIX) && CheckPrice(item);
 
             if (isCustomItem || isValuableItem)
             {
-                //Debug.LogError($"AddLoot {item.IsContainer} {item.Name} {item.LocalizedName()} {transform.position}");
+                
                 var blip = new BlipLoot(id, transform, lazyUpdate);
                 _lootCustomObject.Add(blip);
                 _lootTree?.Insert(blip);
