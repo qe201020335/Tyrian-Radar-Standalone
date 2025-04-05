@@ -288,6 +288,10 @@ namespace Radar
             {
                 if (Radar.radarEnableLootConfig.Value)
                     UpdateLootList();
+                else
+                {
+                    ClearLoot();
+                }
             }
         }
 
