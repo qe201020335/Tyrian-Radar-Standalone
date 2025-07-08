@@ -29,6 +29,7 @@ namespace Radar
         public static ConfigEntry<bool> radarEnableLootConfig;
         public static ConfigEntry<bool> radarEnableFireModeConfig;
         public static ConfigEntry<bool> radarEnableCompassConfig;
+        public static ConfigEntry<bool> radarEnableMinefieldConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableShortCutConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableCorpseShortCutConfig;
         public static ConfigEntry<KeyboardShortcut> radarEnableLootShortCutConfig;
@@ -78,6 +79,7 @@ namespace Radar
             radarEnablePulseConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_pulse_enable"), true, Locales.GetTranslatedString("radar_pulse_enable_info"));
             radarEnableFireModeConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_fire_mode_enable"), false, Locales.GetTranslatedString("radar_fire_mode_enable_info"));
             radarEnableCompassConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_compass_enable"), false, Locales.GetTranslatedString("radar_compass_enable_info"));
+            radarEnableMinefieldConfig = Config.Bind(baseSettings, Locales.GetTranslatedString("radar_minefield_enable"), false, Locales.GetTranslatedString("radar_minefield_enable_info"));
 
             radarEnableCorpseConfig = Config.Bind(advancedSettings, Locales.GetTranslatedString("radar_corpse_enable"), false);
             radarEnableCorpseShortCutConfig = Config.Bind(advancedSettings, Locales.GetTranslatedString("radar_corpse_shortcut"), new KeyboardShortcut(KeyCode.F11));

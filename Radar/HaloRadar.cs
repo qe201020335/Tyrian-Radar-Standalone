@@ -12,6 +12,7 @@ using System.IO;
 using Newtonsoft.Json;
 using System;
 using SPT.Reflection.Utils;
+using System.Reflection;
 
 namespace Radar
 {
@@ -55,6 +56,9 @@ namespace Radar
         private Quadtree _lootTree;
         private List<BlipLoot> _activeLootOnRadar;
         private readonly List<BlipLoot> _lootToHide = new List<BlipLoot>();
+
+        private readonly List<BlipLoot> _mineObject = new List<BlipLoot>();
+        private readonly List<RadarRegion> _mineRegion = new List<RadarRegion>();
 
         private readonly HashSet<string> _containerSet = new HashSet<string>();
 
@@ -153,6 +157,95 @@ namespace Radar
 
             if (Radar.radarEnableLootConfig.Value)
                 UpdateLootList();
+
+            UpdateMineList();
+        }
+
+        private void UpdateMineList()
+        {
+            foreach (var obj in _mineRegion)
+            {
+                if (obj != null)
+                {
+                    obj.Destroy();
+                }
+            }
+            foreach (var obj in _mineObject)
+            {
+                if (obj != null)
+                {
+                    obj.DestroyBlip();
+                }
+            }
+            _mineRegion.Clear();
+            _mineObject.Clear();
+            if (!Radar.radarEnableMinefieldConfig.Value)
+            {
+                return;
+            }
+            foreach (var mine in _gameWorld.MineManager.Mines)
+            {
+                var blip = new BlipLoot(mine.GetInstanceID().ToString(), mine.transform);
+                _mineObject.Add(blip);
+            }
+
+            var zones = LocationScene.GetAllObjects<BorderZone>().ToArray();
+            foreach (var zone in zones)
+            {
+                Debug.LogError($"Zone type: {zone.GetType().Name}");
+                if (zone.GetType().Name == "Minefield")
+                {
+                    FieldInfo triggerZoneSettingsField = typeof(BorderZone)
+                        .GetField("_triggerZoneSettings", BindingFlags.NonPublic | BindingFlags.Instance);
+
+                    FieldInfo extentsField = typeof(BorderZone)
+                        .GetField("_extents", BindingFlags.NonPublic | BindingFlags.Instance);
+
+                    if (triggerZoneSettingsField == null || extentsField == null)
+                    {
+                        throw new InvalidOperationException("Required fields _triggerZoneSettings or _extents were not found in BorderZone.");
+                    }
+
+                    Vector4 triggerZoneSettings = (Vector4)triggerZoneSettingsField.GetValue(zone);
+                    Vector3 extents = (Vector3)extentsField.GetValue(zone);
+                    
+
+                    Transform transform = zone.transform;
+                    Vector3 scale = transform.lossyScale;
+
+                    Vector3 localScale = transform.localScale;
+                    Vector3 worldExtents = new Vector3(
+                        extents.x * localScale.x,
+                        extents.y * localScale.y,
+                        extents.z * localScale.z
+                    );
+
+                    // Calculate min/max XZ offsets in local space (taking triggerZoneSettings into account)
+                    float minXOffset = -extents.x + triggerZoneSettings.y / scale.x;
+                    float maxXOffset = extents.x - triggerZoneSettings.x / scale.x;
+                    float minZOffset = -extents.z + triggerZoneSettings.w / scale.z;
+                    float maxZOffset = extents.z - triggerZoneSettings.z / scale.z;
+
+                    // Define 4 corners in local space (before rotation)
+                    Vector3[] localCorners = new Vector3[]
+                    {
+                        new Vector3(minXOffset, 0, minZOffset),
+                        new Vector3(minXOffset, 0, maxZOffset),
+                        new Vector3(maxXOffset, 0, maxZOffset),
+                        new Vector3(maxXOffset, 0, minZOffset),
+                    };
+
+                    // Rotate and translate to world space
+                    Vector3[] worldCorners = new Vector3[4];
+                    for (int i = 0; i < 4; i++)
+                    {
+                        worldCorners[i] = transform.TransformPoint(localCorners[i]);
+                    }
+
+                    var region = new RadarRegion(worldCorners);
+                    _mineRegion.Add(region);
+                }
+            }
         }
 
         private void InitNormalRadar()
@@ -242,7 +335,7 @@ namespace Radar
             if (_lootCustomObject.Count > 0)
             {
                 foreach (var loot in _lootCustomObject)
-                    loot.DestoryBlip();
+                    loot.DestroyBlip();
 
                 _lootCustomObject.Clear();
             }
@@ -272,6 +365,9 @@ namespace Radar
 
             if (e != null && e.ChangedSetting == Radar.radarEnableCompassConfig)
                 InitRadar();
+
+            if (e != null && e.ChangedSetting == Radar.radarEnableMinefieldConfig)
+                UpdateMineList();
 
             if (!Radar.radarEnableCompassConfig.Value)
             {
@@ -425,7 +521,7 @@ namespace Radar
                 {
                     point.x = loot.targetPosition.x;
                     point.y = loot.targetPosition.z;
-                    loot.DestoryBlip();
+                    loot.DestroyBlip();
                     _lootCustomObject.Remove(loot);
                     break;
                 }
@@ -570,6 +666,12 @@ namespace Radar
 
             foreach (var obj in _lootToHide)
                 obj.Update(false);
+
+            foreach (var obj in _mineObject)
+                obj.Update(true, Color.black);
+
+            foreach (var obj in _mineRegion)
+                obj.UpdateVisual();
 
             if (_activeLootOnRadar != null)
             {

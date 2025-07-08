@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
 using Item = EFT.InventoryLogic.Item;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Radar
 {
@@ -136,7 +138,7 @@ namespace Radar
             _lazyUpdate = lazyUpdate;
         }
 
-        private void UpdateBlipImage()
+        private void UpdateBlipImage(Color? blipColor = null)
         {
             if (blip == null || blipImage == null)
                 return;
@@ -152,13 +154,21 @@ namespace Radar
             {
                 blipImage.sprite = AssetBundleManager.EnemyBlipDead;
             }
-            blipImage.color = Radar.lootBlipColor.Value;
+
+            if (blipColor != null)
+            {
+                blipImage.color = blipColor.Value;
+            }
+            else
+            {
+                blipImage.color = Radar.lootBlipColor.Value;
+            }
 
             float blipSize = Radar.radarBlipSizeConfig.Value * 3f;
             blip.transform.localScale = new Vector3(blipSize, blipSize, blipSize);
         }
 
-        public void Update(bool _show)
+        public void Update(bool _show, Color? blipColor = null)
         {
             if (_lazyUpdate)
             {
@@ -180,7 +190,7 @@ namespace Radar
             }
             else
             {
-                UpdateBlipImage();
+                UpdateBlipImage(blipColor);
                 //UpdateAlpha();
                 UpdatePosition(true);
             }
@@ -204,8 +214,7 @@ namespace Radar
 
         public void SetBlip()
         {
-            var blipInstance = Object.Instantiate(AssetBundleManager.RadarBliphudPrefab);
-            blip = blipInstance as GameObject;
+            blip = Object.Instantiate(AssetBundleManager.RadarBliphudPrefab);
             blip.transform.SetParent(HaloRadar.RadarBorderTransform.transform);
             blip.transform.SetAsLastSibling();
             blip.transform.localPosition = Vector3.zero;
@@ -225,7 +234,7 @@ namespace Radar
             SetBlip();
         }
 
-        public void DestoryBlip()
+        public void DestroyBlip()
         {
             Object.Destroy(blip);
         }
@@ -308,6 +317,181 @@ namespace Radar
                 Mathf.Sin(angleInRadians - angle * Mathf.Deg2Rad),
                 Mathf.Cos(angleInRadians - angle * Mathf.Deg2Rad), -0.01f)
                 * offsetRadius * graphicRadius;
+        }
+    }
+
+    public class PolygonGraphic : Graphic
+    {
+        public List<Vector2> points = new();
+        public float edgeFade = 8f; // Pixels for fade out
+
+        protected override void OnPopulateMesh(Mesh mesh)
+        {
+            mesh.Clear();
+            if (points.Count < 3) return;
+
+            var vertices = new List<Vector3>();
+            var triangles = new List<int>();
+
+            // Remove this offset - use the points as-is
+            // Vector2 offset = rectTransform.rect.size * 0.5f;
+
+            foreach (var p in points)
+                vertices.Add(new Vector3(p.x, p.y, 0));  // Remove offset addition
+
+            for (int i = 1; i < points.Count - 1; i++)
+            {
+                triangles.Add(0);
+                triangles.Add(i);
+                triangles.Add(i + 1);
+            }
+
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0);
+            mesh.SetColors(Enumerable.Repeat(color, vertices.Count).ToList());
+        }
+
+
+        public void UpdatePolygon(List<Vector2> newPoints)
+        {
+            points = newPoints;
+            SetVerticesDirty();  // Triggers mesh update
+        }
+    }
+
+    public class RadarRegion
+    {
+        private GameObject regionRoot;
+        private List<RectTransform> cornerDots = new();
+        private List<RectTransform> edgeLines = new();
+        private PolygonGraphic? fillPolygon;
+
+        private Vector3[] worldCorners = new Vector3[4];  // bottomLeft, bottomRight, topRight, topLeft
+
+        public RadarRegion(Vector3[] _worldCorners)
+        {
+            worldCorners = _worldCorners;
+
+            regionRoot = new GameObject("RadarRegion", typeof(RectTransform));
+            //regionRoot.transform.SetParent(HaloRadar.RadarBorderTransform, false);
+            //regionRoot.transform.localScale = Vector3.one;
+
+            // Add these lines:
+            var rootRT = regionRoot.GetComponent<RectTransform>();
+            rootRT.SetParent(HaloRadar.RadarBorderTransform, false);
+            rootRT.localScale = Vector3.one;
+            rootRT.anchorMin = new Vector2(0.5f, 0.5f);
+            rootRT.anchorMax = new Vector2(0.5f, 0.5f);
+            rootRT.pivot = new Vector2(0.5f, 0.5f);
+            rootRT.anchoredPosition = Vector2.zero;
+
+            CreateCornerDots();
+            CreateEdgeLines();
+            CreateFillPolygon();
+            UpdateVisual();
+        }
+
+        private void CreateFillPolygon()
+        {
+            GameObject fillGO = new GameObject("RadarRegionFill", typeof(RectTransform), typeof(CanvasRenderer), typeof(PolygonGraphic));
+            fillGO.transform.SetParent(regionRoot.transform, false);
+
+            var rect = fillGO.GetComponent<RectTransform>();
+
+            // Match parent size and position
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = HaloRadar.RadarBorderTransform.sizeDelta;
+
+            fillPolygon = fillGO.GetComponent<PolygonGraphic>();
+            fillPolygon.color = new Color(1f, 0f, 0f, 0.3f);  // Semi-transparent red
+        }
+
+
+        private void CreateCornerDots()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                var dotGO = new GameObject($"Corner{i}", typeof(RectTransform), typeof(Image));
+                dotGO.transform.SetParent(regionRoot.transform, false);
+
+                var rect = dotGO.GetComponent<RectTransform>();
+                var img = dotGO.GetComponent<Image>();
+                rect.sizeDelta = new Vector2(6, 6);
+                img.color = new Color(1f, 0.3f, 0.3f, 0.9f); // red-ish dot
+
+                cornerDots.Add(rect);
+            }
+        }
+
+        private void CreateEdgeLines()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                var edgeGO = new GameObject($"Edge{i}", typeof(RectTransform), typeof(Image));
+                edgeGO.transform.SetParent(regionRoot.transform, false);
+
+                var rect = edgeGO.GetComponent<RectTransform>();
+                var img = edgeGO.GetComponent<Image>();
+                rect.sizeDelta = new Vector2(2, 10); // Will stretch later
+                img.color = new Color(1f, 0.3f, 0.3f, 0.5f); // transparent line
+
+                edgeLines.Add(rect);
+            }
+        }
+
+        private Vector2 WorldToRadarPosition(Vector3 worldPos)
+        {
+            Vector3 relative = worldPos - Target.playerPosition;
+
+            float distance = Mathf.Sqrt(relative.x * relative.x + relative.z * relative.z);
+            float scale = Mathf.Pow(
+                distance / Target.radarOuterRange,
+                0.4f + Radar.radarDistanceScaleConfig.Value * Radar.radarDistanceScaleConfig.Value / 2.0f
+            );
+
+            Vector3 borderScale = HaloRadar.RadarBorderTransform.localScale;
+            Vector2 radarSize = HaloRadar.RadarBorderTransform.sizeDelta;
+            radarSize.x *= borderScale.x;
+            radarSize.y *= borderScale.y;
+            float radarRadius = Mathf.Min(radarSize.x, radarSize.y) * 0.68f;
+
+            Vector2 dir = new Vector2(relative.x, relative.z).normalized;
+            return dir * radarRadius * scale;
+        }
+
+        public void UpdateVisual()
+        {
+            Vector2[] radarPositions = new Vector2[4];
+            for (int i = 0; i < 4; i++)
+            {
+                radarPositions[i] = WorldToRadarPosition(worldCorners[i]);
+                cornerDots[i].anchoredPosition = radarPositions[i];
+            }
+
+            // Update edges: draw from i to (i+1)%4
+            for (int i = 0; i < 4; i++)
+            {
+                Vector2 from = radarPositions[i];
+                Vector2 to = radarPositions[(i + 1) % 4];
+                Vector2 delta = to - from;
+
+                RectTransform edge = edgeLines[i];
+                edge.sizeDelta = new Vector2(2f, delta.magnitude);
+                edge.anchoredPosition = (from + to) / 2;
+                float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+                edge.localRotation = Quaternion.Euler(0, 0, angle - 90);
+            }
+
+            
+            fillPolygon?.UpdatePolygon(new List<Vector2>(radarPositions));
+        }
+
+        public void Destroy()
+        {
+            Object.Destroy(regionRoot);
         }
     }
 }
