@@ -324,6 +324,7 @@ namespace Radar
     {
         public List<Vector2> points = new();
         public float edgeFade = 8f; // Pixels for fade out
+        public float outlineWidth = 0f; // Outline width in pixels
 
         protected override void OnPopulateMesh(Mesh mesh)
         {
@@ -332,25 +333,55 @@ namespace Radar
 
             var vertices = new List<Vector3>();
             var triangles = new List<int>();
+            var colors = new List<Color>();
 
-            // Remove this offset - use the points as-is
-            // Vector2 offset = rectTransform.rect.size * 0.5f;
+            // Center of polygon
+            Vector2 centroid = Vector2.zero;
+            foreach (var p in points) centroid += p;
+            centroid /= points.Count;
 
-            foreach (var p in points)
-                vertices.Add(new Vector3(p.x, p.y, 0));  // Remove offset addition
+            // Add center vertex (fully opaque)
+            vertices.Add(new Vector3(centroid.x, centroid.y, 0));
+            colors.Add(color); // opaque center
 
-            for (int i = 1; i < points.Count - 1; i++)
+            int centerIndex = 0;
+
+            for (int i = 0; i < points.Count; i++)
             {
-                triangles.Add(0);
-                triangles.Add(i);
-                triangles.Add(i + 1);
+                Vector2 p1 = points[i];
+                Vector2 p2 = points[(i + 1) % points.Count];
+
+                Vector2 dir1 = (p1 - centroid).normalized * edgeFade;
+                Vector2 dir2 = (p2 - centroid).normalized * edgeFade;
+
+                Vector2 outer1 = p1 + dir1;
+                Vector2 outer2 = p2 + dir2;
+
+                int i0 = vertices.Count;
+                vertices.Add(new Vector3(p1.x, p1.y, 0)); colors.Add(color);          // inner vertex
+                vertices.Add(new Vector3(p2.x, p2.y, 0)); colors.Add(color);          // inner vertex
+                vertices.Add(new Vector3(outer2.x, outer2.y, 0)); colors.Add(new Color(color.r, color.g, color.b, 0));  // outer transparent
+                vertices.Add(new Vector3(outer1.x, outer1.y, 0)); colors.Add(new Color(color.r, color.g, color.b, 0));  // outer transparent
+
+                // Center fan triangle
+                triangles.Add(centerIndex);
+                triangles.Add(i0);
+                triangles.Add(i0 + 1);
+
+                // Outer quad (two triangles for feathered edge)
+                triangles.Add(i0 + 1);
+                triangles.Add(i0 + 2);
+                triangles.Add(i0 + 3);
+
+                triangles.Add(i0 + 3);
+                triangles.Add(i0);
+                triangles.Add(i0 + 1);
             }
 
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0);
-            mesh.SetColors(Enumerable.Repeat(color, vertices.Count).ToList());
+            mesh.SetColors(colors);
         }
-
 
         public void UpdatePolygon(List<Vector2> newPoints)
         {
@@ -361,16 +392,27 @@ namespace Radar
 
     public class RadarRegion
     {
+        public static Vector3 playerPosition;
+        public static Color initColor;
         private GameObject regionRoot;
         private List<RectTransform> cornerDots = new();
         private List<RectTransform> edgeLines = new();
         private PolygonGraphic? fillPolygon;
 
         private Vector3[] worldCorners = new Vector3[4];  // bottomLeft, bottomRight, topRight, topLeft
+        private Vector3 center;
+
 
         public RadarRegion(Vector3[] _worldCorners)
         {
             worldCorners = _worldCorners;
+
+            center = Vector3.zero;
+            for (int i = 0; i < 4; i++)
+            {
+                center += worldCorners[i];
+            }
+            center /= 4f;
 
             regionRoot = new GameObject("RadarRegion", typeof(RectTransform));
             //regionRoot.transform.SetParent(HaloRadar.RadarBorderTransform, false);
@@ -385,10 +427,15 @@ namespace Radar
             rootRT.pivot = new Vector2(0.5f, 0.5f);
             rootRT.anchoredPosition = Vector2.zero;
 
-            CreateCornerDots();
-            CreateEdgeLines();
+            //CreateCornerDots();
+            //CreateEdgeLines();
             CreateFillPolygon();
             UpdateVisual();
+        }
+
+        public static void setPlayerPosition(Vector3 playerPosition)
+        {
+            RadarRegion.playerPosition = playerPosition;
         }
 
         private void CreateFillPolygon()
@@ -444,7 +491,7 @@ namespace Radar
 
         private Vector2 WorldToRadarPosition(Vector3 worldPos)
         {
-            Vector3 relative = worldPos - Target.playerPosition;
+            Vector3 relative = worldPos - RadarRegion.playerPosition;
 
             float distance = Mathf.Sqrt(relative.x * relative.x + relative.z * relative.z);
             float scale = Mathf.Pow(
@@ -468,24 +515,44 @@ namespace Radar
             for (int i = 0; i < 4; i++)
             {
                 radarPositions[i] = WorldToRadarPosition(worldCorners[i]);
-                cornerDots[i].anchoredPosition = radarPositions[i];
+                //cornerDots[i].anchoredPosition = radarPositions[i];
+            }
+
+            // Calculate distance
+            float dx = playerPosition.x - center.x;
+            float dz = playerPosition.z - center.z;
+            float distance = Mathf.Sqrt(dx * dx + dz * dz);
+
+            float alpha = 1.0f;
+            if (distance > Target.radarOuterRange - 20)
+            {
+                float t = distance - (Target.radarOuterRange - 20.0f);
+                t = Mathf.Clamp01(t / 20.0f);
+                alpha = 1f - t * t * (3f - 2f * t);
+            }
+
+            if (fillPolygon != null)
+            {
+                Color c = initColor;
+                c.a *= alpha;
+                fillPolygon.color = c;
             }
 
             // Update edges: draw from i to (i+1)%4
-            for (int i = 0; i < 4; i++)
-            {
-                Vector2 from = radarPositions[i];
-                Vector2 to = radarPositions[(i + 1) % 4];
-                Vector2 delta = to - from;
+            //for (int i = 0; i < 4; i++)
+            //{
+            //    Vector2 from = radarPositions[i];
+            //    Vector2 to = radarPositions[(i + 1) % 4];
+            //    Vector2 delta = to - from;
 
-                RectTransform edge = edgeLines[i];
-                edge.sizeDelta = new Vector2(2f, delta.magnitude);
-                edge.anchoredPosition = (from + to) / 2;
-                float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
-                edge.localRotation = Quaternion.Euler(0, 0, angle - 90);
-            }
+            //    RectTransform edge = edgeLines[i];
+            //    edge.sizeDelta = new Vector2(2f, delta.magnitude);
+            //    edge.anchoredPosition = (from + to) / 2;
+            //    float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+            //    edge.localRotation = Quaternion.Euler(0, 0, angle - 90);
+            //}
 
-            
+
             fillPolygon?.UpdatePolygon(new List<Vector2>(radarPositions));
         }
 

@@ -52,7 +52,8 @@ namespace Radar
                 {"radar_bear_blip_color","BEAR Color"},
                 {"radar_corpse_blip_color","Corpse Color"},
                 {"radar_loot_blip_color","Loot Color"},
-                {"radar_background_blip_color","Background Color"},
+                {"radar_background_color","Background Color"},
+                {"radar_minefield_color","Minefield Color"},
             }},
             {"ZH", new Dictionary<string, string>{
                 {"radar_enable", "开启雷达"},
@@ -96,7 +97,8 @@ namespace Radar
                 {"radar_bear_blip_color", "BEAR颜色"},
                 {"radar_corpse_blip_color", "尸体颜色"},
                 {"radar_loot_blip_color", "物品颜色"},
-                {"radar_background_blip_color", "背景颜色"},
+                {"radar_background_color", "背景颜色"},
+                {"radar_minefield_color","雷区颜色"},
             }},
             {"RU", new Dictionary<string, string>{
                 {"radar_enable", "Радар"},
@@ -140,7 +142,8 @@ namespace Radar
                 {"radar_bear_blip_color", "Цвет BEAR"},
                 {"radar_corpse_blip_color", "Цвет трупа"},
                 {"radar_loot_blip_color", "Цвет добычи"},
-                {"radar_background_blip_color", "Цвет фона"},
+                {"radar_background_color", "Цвет фона"},
+                {"radar_minefield_color","Цвет Минное"},
             }},
             {"KO", new Dictionary<string, string>{
                 {"radar_enable","레이더 활성화"},
@@ -184,7 +187,8 @@ namespace Radar
                 {"radar_bear_blip_color","BEAR 색상"},
                 {"radar_corpse_blip_color","시체 색상"},
                 {"radar_loot_blip_color","전리품 색상"},
-                {"radar_background_blip_color","배경 색상"},
+                {"radar_background_color","배경 색상"},
+                {"radar_minefield_color","지뢰밭 색상"},
             }},
         };
 

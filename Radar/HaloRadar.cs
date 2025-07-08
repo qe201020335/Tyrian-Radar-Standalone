@@ -116,6 +116,8 @@ namespace Radar
 
             _radarCanvas = GetComponentInChildren<Canvas>();
 
+            RadarRegion.initColor = Radar.minefieldColor.Value;
+
             //Debug.LogError($"& HUD: {this.transform.position} {this.transform.localPosition} {this.transform.rotation} {this.transform.localRotation} {this.transform.localScale}");
             //Debug.LogError($"& RBT: {RadarBaseTransform.position} {RadarBaseTransform.localPosition} {RadarBaseTransform.rotation} {RadarBaseTransform.localRotation} {RadarBaseTransform.localScale}");
             //Debug.LogError($"& BOD: {RadarBorderTransform.position} {RadarBorderTransform.localPosition} {RadarBorderTransform.rotation} {RadarBorderTransform.localRotation} {RadarBorderTransform.localScale}");
@@ -368,6 +370,9 @@ namespace Radar
 
             if (e != null && e.ChangedSetting == Radar.radarEnableMinefieldConfig)
                 UpdateMineList();
+
+            if (e != null && e.ChangedSetting == Radar.minefieldColor)
+                RadarRegion.initColor = Radar.minefieldColor.Value;
 
             if (!Radar.radarEnableCompassConfig.Value)
             {
@@ -661,6 +666,7 @@ namespace Radar
         {
             Target.setPlayerPosition(_player.Transform.position);
             Target.setRadarRange(Radar.radarInnerRangeConfig.Value, Radar.radarOuterRangeConfig.Value);
+            RadarRegion.setPlayerPosition(_player.Transform.position);
             foreach (var obj in _enemyList)
                 obj.Value.Update(positionUpdate);
 
