@@ -14,6 +14,8 @@ using System.Threading;
 using static System.Collections.Specialized.BitVector32;
 using System.Threading.Tasks;
 using System.Collections;
+using UnityEngine.UI;
+using System.Text;
 
 internal static class TraderClassExtensions
 {
@@ -37,6 +39,102 @@ internal static class TraderClassExtensions
         {
             UnityEngine.Debug.LogError($"Error updating supply data for trader {trader.Id}: {ex}");
         }
+    }
+}
+
+internal static class FleaPriceCache
+{
+    private static ISession Session = ClientAppUtils.GetMainApp().GetClientBackEndSession();
+    static Dictionary<string, CachePrice> cache = new Dictionary<string, CachePrice>();
+    public static bool? valid;
+
+    public static bool? IsValid()
+    {
+        if (valid == null)
+        {
+
+            double? price = Task.Run(() => QueryAndTryUpsertPrice("5c06782b86f77426df5407d2")).Result;
+            if (price != null)
+            {
+                valid = true;
+            }
+            else
+            {
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    public static double? FetchPrice(string templateId)
+    {
+        bool fleaAvailable = Session.RagFair.Available;
+
+        if (!fleaAvailable)
+            return null;
+
+        if (cache.ContainsKey(templateId))
+        {
+            double secondsSinceLastUpdate = (DateTime.Now - cache[templateId].lastUpdate).TotalSeconds;
+            if (secondsSinceLastUpdate > 300)
+                _ = QueryAndTryUpsertPrice(templateId);
+            return cache[templateId].price;
+        }
+        else
+        {
+            _ = QueryAndTryUpsertPrice(templateId);
+            return null;
+        }
+    }
+
+    public class FleaPriceRequest
+    {
+        public string templateId;
+        public FleaPriceRequest(string templateId) => this.templateId = templateId;
+    }
+
+    private static async Task<string> QueryPrice(string templateId)
+    {
+        string json = JsonConvert.SerializeObject(new FleaPriceRequest(templateId));
+        string path = "/LootValue/GetItemLowestFleaPrice";
+        byte[] bytes = Encoding.UTF8.GetBytes(json);
+        byte[] bytes2 = await RequestHandler.HttpClient.PostAsync(path, bytes);
+        string @string = Encoding.UTF8.GetString(bytes2);
+        return @string;
+    }
+
+    private static async Task<double?> QueryAndTryUpsertPrice(string templateId)
+    {
+        string response = await QueryPrice(templateId);
+
+        if (!string.IsNullOrEmpty(response) && response != "null")
+        {
+            double price = double.Parse(response);
+
+            if (price < 0)
+            {
+                cache.Remove(templateId);
+                return null;
+            }
+
+            cache[templateId] = new CachePrice(price);
+
+            return price;
+        }
+
+        return null;
+    }
+}
+
+internal struct CachePrice
+{
+    public double price { get; private set; }
+    public DateTime lastUpdate { get; private set; }
+
+    public CachePrice(double price)
+    {
+        this.price = price;
+        lastUpdate = DateTime.Now;
     }
 }
 
@@ -153,6 +251,14 @@ class ItemExtensions : MonoBehaviour
 
     public static int GetFleaPrice(Item item)
     {
+        if (FleaPriceCache.IsValid() == true)
+        {
+            double? price = FleaPriceCache.FetchPrice(item.TemplateId);
+
+            if (price != null)
+                return (int) price;
+        }
+
         if (fleaCache != null && fleaCache.ContainsKey(item.TemplateId))
         {
             return (int) fleaCache[item.TemplateId];
