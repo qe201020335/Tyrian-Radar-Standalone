@@ -6,7 +6,7 @@
 		<DependencyVersion>3.11.0</DependencyVersion>
 		<Nullable>enable</Nullable>
 		<!-- Show build version in file properties -->
-        <Version>1.1.10</Version>
+        <Version>1.2.0</Version>
 	</PropertyGroup>
 	<PropertyGroup>
     	<LangVersion>9</LangVersion>
