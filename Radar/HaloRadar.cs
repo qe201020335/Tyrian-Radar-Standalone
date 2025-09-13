@@ -29,7 +29,7 @@ namespace Radar
         private const string FPS_CAMERA_NAME = "FPS Camera";
         private const string COMPASS_GLASS_NAME = "compas_glass_LOD0";
 
-        private readonly bool debugInfo = false;
+        private readonly bool debugInfo = true;
 
         private GameWorld _gameWorld;
         private Player _player;
@@ -50,14 +50,14 @@ namespace Radar
 
         private readonly Dictionary<string, BlipPlayer> _enemyList = new Dictionary<string, BlipPlayer>();
 
-        private readonly List<BlipLoot> _lootCustomObject = new List<BlipLoot>();
+        private readonly List<BlipOther> _lootCustomObject = new List<BlipOther>();
         private readonly HashSet<string> _lootInList = new HashSet<string>();
         private readonly Dictionary<string, Transform> _containerTransforms = new Dictionary<string, Transform>();
         private Quadtree _lootTree;
-        private List<BlipLoot> _activeLootOnRadar;
-        private readonly List<BlipLoot> _lootToHide = new List<BlipLoot>();
+        private List<BlipOther> _activeLootOnRadar;
+        private readonly List<BlipOther> _lootToHide = new List<BlipOther>();
 
-        private readonly List<BlipLoot> _mineObject = new List<BlipLoot>();
+        private readonly List<BlipOther> _mineObject = new List<BlipOther>();
         private readonly List<RadarRegion> _mineRegion = new List<RadarRegion>();
 
         private readonly HashSet<string> _containerSet = new HashSet<string>();
@@ -187,7 +187,7 @@ namespace Radar
             }
             foreach (var mine in _gameWorld.MineManager.Mines)
             {
-                var blip = new BlipLoot(mine.GetInstanceID().ToString(), mine.transform);
+                var blip = new BlipOther(mine.GetInstanceID().ToString(), mine.transform, false, 1);
                 _mineObject.Add(blip);
             }
 
@@ -433,7 +433,7 @@ namespace Radar
 
             // Create quadtree with padding
             _lootTree = new Quadtree(Rect.MinMaxRect(xMin - 5, yMin - 2, xMax + 5, yMax + 2));
-            foreach (BlipLoot loot in _lootCustomObject)
+            foreach (BlipOther loot in _lootCustomObject)
                 _lootTree.Insert(loot);
         }
 
@@ -498,7 +498,7 @@ namespace Radar
             if (isCustomItem || isValuableItem)
             {
                 
-                var blip = new BlipLoot(id, transform, lazyUpdate);
+                var blip = new BlipOther(id, transform, lazyUpdate);
                 _lootCustomObject.Add(blip);
                 _lootTree?.Insert(blip);
                 _lootInList.Add(id);

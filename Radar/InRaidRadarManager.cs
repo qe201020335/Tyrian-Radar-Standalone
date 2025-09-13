@@ -25,7 +25,7 @@ namespace Radar
                 return;
             }
 
-            _radarGo = Instantiate(AssetBundleManager.RadarhudPrefab);
+            _radarGo = Instantiate(AssetFileManager.RadarhudPrefab);
             _radarGo.transform.SetParent(playerCamera.transform);
             _radarGo.AddComponent<HaloRadar>();
             Radar.Log.LogInfo("Radar instantiated");

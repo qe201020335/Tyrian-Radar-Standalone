@@ -14,13 +14,13 @@ namespace Radar
             root = new QuadtreeNode(bounds, maxDepth);
         }
 
-        public void Insert(BlipLoot obj)
+        public void Insert(BlipOther obj)
         {
             Vector2 point = new Vector2(obj.targetPosition.x, obj.targetPosition.z);
             root.Insert(point, obj);
         }
 
-        public List<BlipLoot> QueryRange(Vector2 center, float radius)
+        public List<BlipOther> QueryRange(Vector2 center, float radius)
         {
             return root.QueryRange(new Circle(center, radius));
         }
@@ -46,7 +46,7 @@ namespace Radar
         private Rect bounds;
         private int maxDepth;
         private int currentDepth;
-        private List<(Vector2 point, BlipLoot obj)> objects = new List<(Vector2, BlipLoot)>();
+        private List<(Vector2 point, BlipOther obj)> objects = new List<(Vector2, BlipOther)>();
         private QuadtreeNode[] children = new QuadtreeNode[4];
         private const int MAX_OBJECTS_BEFORE_SUBDIVIDE = 10;
 
@@ -74,7 +74,7 @@ namespace Radar
             return count;
         }
 
-        public void Insert(Vector2 point, BlipLoot obj)
+        public void Insert(Vector2 point, BlipOther obj)
         {
             if (!bounds.Contains(point))
             {
@@ -124,9 +124,9 @@ namespace Radar
             }
         }
 
-        public List<BlipLoot> QueryRange(Circle range)
+        public List<BlipOther> QueryRange(Circle range)
         {
-            var results = new List<BlipLoot>();
+            var results = new List<BlipOther>();
 
             if (!bounds.Overlaps(range.GetBounds()))
             {

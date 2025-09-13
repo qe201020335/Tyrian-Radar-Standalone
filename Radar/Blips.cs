@@ -5,6 +5,7 @@ using Object = UnityEngine.Object;
 using Item = EFT.InventoryLogic.Item;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Radar
 {
@@ -23,50 +24,63 @@ namespace Radar
 
             float totalThreshold = playerHeight * 1.5f * Radar.radarYHeightThreshold.Value;
 
-            if (Mathf.Abs(blipPosition.y) <= totalThreshold)
+            Sprite[] targetBlips = AssetFileManager.NormalEnemyBlips;
+
+            switch (_enemyPlayer.Profile.Info.Side)
             {
-                blipImage.sprite = _isDead ? AssetBundleManager.EnemyBlipDead  : AssetBundleManager.EnemyBlip;
-            }
-            else if (blipPosition.y > totalThreshold)
-            {
-                blipImage.sprite = AssetBundleManager.EnemyBlipUp;
-            }
-            else if (blipPosition.y < -totalThreshold)
-            {
-                blipImage.sprite = AssetBundleManager.EnemyBlipDown;
+                case EPlayerSide.Savage:
+                    switch (_enemyPlayer.Profile.Info.Settings.Role)
+                    {
+                        case WildSpawnType.assault:
+                        case WildSpawnType.marksman:
+                        case WildSpawnType.assaultGroup:
+                            blipImage.color = Radar.scavBlipColor.Value;
+                            break;
+                        case WildSpawnType.shooterBTR:
+                            targetBlips = AssetFileManager.BTRBlips;
+                            blipImage.color = Color.red;
+                            break;
+                        default:
+                            targetBlips = AssetFileManager.BossEnemyBlips;
+                            blipImage.color = Radar.bossBlipColor.Value;
+                            break;
+                    }
+                    break;
+                case EPlayerSide.Bear:
+                    blipImage.color = Radar.bearBlipColor.Value;
+                    break;
+                case EPlayerSide.Usec:
+                    blipImage.color = Radar.usecBlipColor.Value;
+                    break;
+                default:
+                    break;
             }
 
             if (_isDead)
             {
+                targetBlips = AssetFileManager.DeadEnemyBlips;
+                if (outline == null)
+                {
+                    outline = blipImage.GetOrAddComponent<Outline>();
+                    outline.effectDistance = new Vector2(1, -1);
+                }
+                outline.effectColor = blipImage.color;
                 blipImage.color = Radar.corpseBlipColor.Value;
+            }
+
+            if (blipPosition.y > totalThreshold)
+            {
+                blipImage.sprite = targetBlips[1];
+            }
+            else if (blipPosition.y < -totalThreshold)
+            {
+                blipImage.sprite = targetBlips[2];
             }
             else
             {
-                switch (_enemyPlayer.Profile.Info.Side)
-                {
-                    case EPlayerSide.Savage:
-                        switch (_enemyPlayer.Profile.Info.Settings.Role)
-                        {
-                            case WildSpawnType.assault:
-                            case WildSpawnType.marksman:
-                            case WildSpawnType.assaultGroup:
-                                blipImage.color = Radar.scavBlipColor.Value;
-                                break;
-                            default:
-                                blipImage.color = Radar.bossBlipColor.Value;
-                                break;
-                        }
-                        break;
-                    case EPlayerSide.Bear:
-                        blipImage.color = Radar.bearBlipColor.Value;
-                        break;
-                    case EPlayerSide.Usec:
-                        blipImage.color = Radar.usecBlipColor.Value;
-                        break;
-                    default:
-                        break;
-                }
+                blipImage.sprite = targetBlips[0];
             }
+
             float blipSize = Radar.radarBlipSizeConfig.Value * 3f;
             blip.transform.localScale = new Vector3(blipSize, blipSize, blipSize);
         }
@@ -124,18 +138,20 @@ namespace Radar
         }
     }
 
-    public class BlipLoot : Target
+    public class BlipOther : Target
     {
         public string _id;
         public Transform _transform;
         private bool _lazyUpdate;
+        private int _type;
 
-        public BlipLoot(string id, Transform transform, bool lazyUpdate = false)
+        public BlipOther(string id, Transform transform, bool lazyUpdate = false, int type = 0)
         {
             _id = id;
             _transform = transform;
             targetPosition = transform.position;
             _lazyUpdate = lazyUpdate;
+            _type = type;
         }
 
         private void UpdateBlipImage(Color? blipColor = null)
@@ -143,16 +159,24 @@ namespace Radar
             if (blip == null || blipImage == null)
                 return;
             float totalThreshold = playerHeight * 1.5f * Radar.radarYHeightThreshold.Value;
+
+            Sprite[] targetBlips = AssetFileManager.LootBlips;
+            if (_type == 1)
+            {
+                targetBlips = AssetFileManager.MineBlips;
+            }
+
             if (blipPosition.y > totalThreshold)
             {
-                blipImage.sprite = AssetBundleManager.EnemyBlipUp;
+                blipImage.sprite = targetBlips[1];
             }
             else if (blipPosition.y < -totalThreshold)
             {
-                blipImage.sprite = AssetBundleManager.EnemyBlipDown;
-            } else
+                blipImage.sprite = targetBlips[2];
+            }
+            else
             {
-                blipImage.sprite = AssetBundleManager.EnemyBlipDead;
+                blipImage.sprite = targetBlips[0];
             }
 
             if (blipColor != null)
@@ -201,6 +225,7 @@ namespace Radar
     {
         public bool show = false;
         protected GameObject? blip;
+        protected Outline? outline;
         protected Image? blipImage;
 
         protected Vector3 blipPosition;
@@ -214,7 +239,7 @@ namespace Radar
 
         public void SetBlip()
         {
-            blip = Object.Instantiate(AssetBundleManager.RadarBliphudPrefab);
+            blip = Object.Instantiate(AssetFileManager.RadarBliphudPrefab);
             blip.transform.SetParent(HaloRadar.RadarBorderTransform.transform);
             blip.transform.SetAsLastSibling();
             blip.transform.localPosition = Vector3.zero;
