@@ -4,11 +4,11 @@ using EFT.Interactive;
 
 namespace Radar.Patches
 {
-    internal class GClass723PatchAdd : ModulePatch
+    internal class GClass818PatchAdd : ModulePatch
     {
         protected override MethodBase GetTargetMethod()
         {
-            return typeof(GClass797<int, LootItem>).GetMethod("Add", BindingFlags.Instance | BindingFlags.Public);
+            return typeof(GClass818<int, LootItem>).GetMethod("Add", BindingFlags.Instance | BindingFlags.Public);
         }
 
         [PatchPostfix]
@@ -32,7 +32,7 @@ namespace Radar.Patches
     {
         protected override MethodBase GetTargetMethod()
         {
-            return typeof(GClass797<int, LootItem>).GetMethod("Remove", BindingFlags.Instance | BindingFlags.Public);
+            return typeof(GClass818<int, LootItem>).GetMethod("Remove", BindingFlags.Instance | BindingFlags.Public);
         }
 
         [PatchPrefix]
